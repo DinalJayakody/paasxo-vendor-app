@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Paasxo Vendor",
+    "slug": "paasxo-vendor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#184E85"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.paasxo.vendor"
+    },
+    "android": {
+      "package": "com.paasxo.vendor",
+      "adaptiveIcon": {
+        "backgroundColor": "#184E85"
+      }
+    },
+    "scheme": "paasxovendor",
+    "plugins": [
+      "expo-image-picker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Paasxo Vendor uses your location to pin your venue's exact spot on the map."
+        }
+      ]
+    ]
+  }
+}
