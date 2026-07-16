@@ -1,14 +1,28 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // Single backend for both the User App and Vendor App: mobile-app-paasxo.
 // It authenticates via real Firebase ID tokens (not a custom-issued JWT) —
 // idToken/refreshToken below are literally Firebase's, proxied through this
 // Spring Boot service. See authStore.ts / api/auth.ts for the full flow.
-// iOS Simulator  → http://localhost:8080/api/  (works as-is)
-// Android Emulator → replace localhost with 10.0.2.2
-// Physical device  → replace localhost with your machine's LAN IP (run: ipconfig getifaddr en0)
-export const API_BASE_URL = 'http://localhost:8080/api/';
+//
+// iOS Simulator     → http://localhost:8080/api/
+// Android Emulator  → http://10.0.2.2:8080/api/
+// Physical device   → auto-detected from the LAN IP Expo Go is already
+//                      connected through (no manual IP editing, ever)
+function resolveApiBaseUrl(): string {
+  const hostUri = Constants.expoConfig?.hostUri;
+  const lanHost = hostUri?.split(':')[0];
+  const isLanIp = !!lanHost && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(lanHost);
+  if (isLanIp) return `http://${lanHost}:8080/api/`;
+
+  if (Platform.OS === 'android') return 'http://10.0.2.2:8080/api/';
+  return 'http://localhost:8080/api/';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 // In-memory token cache so the request interceptor can read synchronously.
 // Always kept in sync with AsyncStorage via the helpers below.
