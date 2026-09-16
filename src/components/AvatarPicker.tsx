@@ -2,7 +2,8 @@ import React, { useCallback } from 'react';
 import { View, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius } from '@/theme';
+import { radius, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Props {
   uri?: string;
@@ -12,6 +13,8 @@ interface Props {
 
 /** Tappable circular avatar that opens the photo library and returns a local file uri. */
 export default function AvatarPicker({ uri, onChange, size = 92 }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const pick = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -49,7 +52,7 @@ export default function AvatarPicker({ uri, onChange, size = 92 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     alignSelf: 'center',
     borderWidth: 1.5,

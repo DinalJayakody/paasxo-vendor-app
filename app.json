@@ -4,14 +4,23 @@
     "slug": "paasxo-vendor",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "backgroundColor": "#184E85"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.paasxo.vendor"
+      "bundleIdentifier": "com.paasxo.vendor",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "production"
+      }
     },
     "android": {
       "package": "com.paasxo.vendor",
@@ -27,7 +36,9 @@
         {
           "locationWhenInUsePermission": "Paasxo Vendor uses your location to pin your venue's exact spot on the map."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-notifications"
     ]
   }
 }

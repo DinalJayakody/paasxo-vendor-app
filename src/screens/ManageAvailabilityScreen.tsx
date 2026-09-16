@@ -5,12 +5,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import Card from '@/components/Card';
 import PrimaryButton from '@/components/PrimaryButton';
 import ScreenHeader from '@/components/ScreenHeader';
 import EmptyState from '@/components/EmptyState';
 import CalendarPickerModal from '@/components/CalendarPickerModal';
+import ScreenGlow from '@/components/ScreenGlow';
 import { FutsalApi } from '@/api/futsal';
 import { BookingApi } from '@/api/booking';
 import { ClosedDateItem, SlotStatus, TimeSlot } from '@/types';
@@ -44,6 +46,8 @@ function errorMessage(e: any, fallback: string) {
 /** Manage Availability: full calendar date picker, real slot status from GET /futsals/{id}/slots,
  *  and direct tap-to-select booking of multiple available slots in one submit. */
 export default function ManageAvailabilityScreen({ route }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { venueId } = route.params;
   const today = toIso(new Date());
   const [date, setDate] = useState(today);
@@ -217,6 +221,7 @@ export default function ManageAvailabilityScreen({ route }: any) {
 
   return (
     <View style={styles.safe}>
+      <ScreenGlow />
       <ScreenHeader
         title="Manage Availability"
         subtitle={formatDateLabel(date)}
@@ -491,7 +496,7 @@ export default function ManageAvailabilityScreen({ route }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.md },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

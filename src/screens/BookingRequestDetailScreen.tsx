@@ -2,16 +2,19 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, TextInput, Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn, FadeInUp, FadeOut, useSharedValue, useAnimatedStyle,
   withRepeat, withSequence, withTiming, Easing,
 } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import Card from '@/components/Card';
-import GradientBackground from '@/components/GradientBackground';
 import PrimaryButton from '@/components/PrimaryButton';
+import ScreenGlow from '@/components/ScreenGlow';
 import { BookingApi } from '@/api/booking';
 
 function timeLabel(t?: string) {
@@ -26,7 +29,7 @@ function formatDate(iso?: string) {
 }
 
 /** Soft, slow-breathing urgency ring behind the hourglass icon — draws the eye without nagging. */
-function PulsingRing() {
+function PulsingRing({ ringStyle }: { ringStyle: any }) {
   const scale = useSharedValue(1);
   useEffect(() => {
     scale.value = withRepeat(
@@ -42,16 +45,28 @@ function PulsingRing() {
     transform: [{ scale: scale.value }],
     opacity: 1 - (scale.value - 1) / 0.45,
   }));
-  return <Animated.View style={[styles.ring, style]} />;
+  return <Animated.View style={[ringStyle, style]} />;
 }
 
 type Outcome = null | 'accepted' | 'rejected';
+
+function heroGradients(colors: ThemeColors): Record<'pending' | 'accepted' | 'rejected', [string, string]> {
+  return {
+    pending: ['#EA580C', '#C2410C'],
+    accepted: ['#16A34A', '#14532D'],
+    rejected: [colors.danger, '#7F1D1D'],
+  };
+}
 
 /** Reached from a notification tap, the Notifications list, Bookings list, or a
  *  "Request Pending" slot in Manage Availability — always re-fetches by id so the
  *  vendor is acting on live data, not a possibly-stale cached row. */
 export default function BookingRequestDetailScreen({ route, navigation }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const HERO_GRADIENTS = React.useMemo(() => heroGradients(colors), [colors]);
   const { bookingId } = route.params;
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -83,37 +98,52 @@ export default function BookingRequestDetailScreen({ route, navigation }: any) {
 
   const organizerName = booking?.players?.[0]?.displayName;
   const isPending = booking?.status === 'PENDING_VENDOR';
+  const heroState: 'pending' | 'accepted' | 'rejected' =
+    outcome === 'accepted' ? 'accepted' : outcome === 'rejected' ? 'rejected' : 'pending';
 
   if (isLoading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center} edges={['top']}>
         <ActivityIndicator color={colors.warning} size="large" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!booking) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center} edges={['top']}>
         <Text style={styles.notFoundText}>This request could not be found.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: spacing.md }}>
           <Text style={{ color: colors.primary, fontWeight: '700' }}>Go back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.safe}>
-      <View style={styles.hero}>
-        <GradientBackground colors={outcome === 'rejected' ? [colors.danger, '#7F1D1D'] : ['#EA580C', '#C2410C']} />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScreenGlow />
+      <View style={[styles.hero, { paddingTop: spacing.md }]}>
+        <LinearGradient
+          colors={HERO_GRADIENTS[heroState]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()} hitSlop={10}>
           <Ionicons name="close" size={22} color={colors.white} />
         </TouchableOpacity>
 
+        {isPending && outcome === null && (
+          <Animated.View entering={FadeIn.duration(300)} style={styles.statusPill}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusPillText}>AWAITING YOUR DECISION</Text>
+          </Animated.View>
+        )}
+
         {outcome === null ? (
           <Animated.View entering={FadeIn.duration(300)} style={styles.heroIconWrap}>
-            <PulsingRing />
+            <PulsingRing ringStyle={styles.ring} />
             <View style={styles.heroIconCore}>
               <Ionicons name="hourglass-outline" size={40} color="#EA580C" />
             </View>
@@ -137,28 +167,31 @@ export default function BookingRequestDetailScreen({ route, navigation }: any) {
           {outcome === 'accepted'
             ? 'This match is now live and open for players to join.'
             : outcome === 'rejected'
-            ? 'The organizer has been notified and the slot is free again.'
+            ? "The organizer has been notified, their full payment is being refunded automatically, and the slot is free again."
             : isPending
             ? 'A customer wants to book this slot — accept or reject below.'
             : `This request is already ${booking.status === 'ACTIVE_MATCH' ? 'active' : 'closed'}.`}
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: spacing.lg + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View entering={FadeInUp.duration(400).delay(80).springify()}>
-          <Card>
+          <Card style={styles.detailsCard}>
             <View style={styles.detailRow}>
               <View style={styles.detailIcon}><Ionicons name="person-outline" size={16} color={colors.primary} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.detailLabel}>ORGANIZER</Text>
-                <Text style={styles.detailValue}>{organizerName ?? 'A player'}</Text>
+                <Text style={styles.detailValue} numberOfLines={1}>{organizerName ?? 'A player'}</Text>
               </View>
             </View>
             <View style={styles.detailRow}>
               <View style={styles.detailIcon}><Ionicons name="football-outline" size={16} color={colors.primary} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.detailLabel}>MATCH</Text>
-                <Text style={styles.detailValue}>{booking.title || booking.sport || 'Booking'}</Text>
+                <Text style={styles.detailValue} numberOfLines={1}>{booking.title || booking.sport || 'Booking'}</Text>
               </View>
             </View>
             <View style={styles.detailRow}>
@@ -172,11 +205,11 @@ export default function BookingRequestDetailScreen({ route, navigation }: any) {
                 </Text>
               </View>
             </View>
-            <View style={[styles.detailRow, { borderBottomWidth: 0, marginBottom: 0 }]}>
+            <View style={[styles.detailRow, { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}>
               <View style={styles.detailIcon}><Ionicons name="business-outline" size={16} color={colors.primary} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.detailLabel}>VENUE</Text>
-                <Text style={styles.detailValue}>{booking.futsalName}</Text>
+                <Text style={styles.detailValue} numberOfLines={1}>{booking.futsalName}</Text>
               </View>
             </View>
           </Card>
@@ -184,6 +217,9 @@ export default function BookingRequestDetailScreen({ route, navigation }: any) {
 
         {booking.totalPrice != null && (
           <Animated.View entering={FadeInUp.duration(400).delay(140).springify()} style={styles.priceRow}>
+            <View style={styles.priceIconWrap}>
+              <Ionicons name="wallet-outline" size={18} color={colors.primary} />
+            </View>
             <Text style={styles.priceLabel}>Total value</Text>
             <Text style={styles.priceValue}>LKR {booking.totalPrice.toFixed(2)}</Text>
           </Animated.View>
@@ -204,10 +240,12 @@ export default function BookingRequestDetailScreen({ route, navigation }: any) {
                 />
                 <View style={styles.actionRow}>
                   <TouchableOpacity style={styles.cancelReasonBtn} onPress={() => setRejecting(false)}>
+                    <Ionicons name="arrow-back-outline" size={18} color={colors.textMuted} />
                     <Text style={styles.cancelReasonText}>Back</Text>
                   </TouchableOpacity>
                   <PrimaryButton
                     title="Confirm Reject"
+                    icon="close-circle-outline"
                     onPress={() => rejectMutation.mutate()}
                     loading={rejectMutation.isPending}
                     style={{ flex: 1, backgroundColor: colors.danger, shadowColor: colors.danger }}
@@ -242,16 +280,15 @@ export default function BookingRequestDetailScreen({ route, navigation }: any) {
           </Animated.View>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: spacing.lg },
   notFoundText: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
   hero: {
-    paddingTop: spacing.xl + spacing.md,
     paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
@@ -260,10 +297,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   closeBtn: {
-    position: 'absolute', top: spacing.xl, right: spacing.lg, zIndex: 2,
+    position: 'absolute', top: spacing.sm, right: spacing.lg, zIndex: 2,
     width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 12, paddingVertical: 5,
+    marginBottom: spacing.md,
+    marginTop: spacing.lg,
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.white },
+  statusPillText: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6, color: colors.white },
   heroIconWrap: {
     width: 84, height: 84, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm,
   },
@@ -272,17 +321,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.35)',
   },
   heroIconCore: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: colors.white,
+    width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+    shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 6,
   },
   heroIconAccepted: { backgroundColor: colors.successLight },
   heroIconRejected: { backgroundColor: colors.dangerLight },
   heroTitle: { ...typography.h1, fontSize: 24, color: colors.white, textAlign: 'center' },
   heroSubtitle: {
-    ...typography.body, color: 'rgba(255,255,255,0.9)', textAlign: 'center', marginTop: 4, paddingHorizontal: spacing.sm,
+    ...typography.body, color: 'rgba(255,255,255,0.92)', textAlign: 'center', marginTop: 4, paddingHorizontal: spacing.sm,
   },
-  scroll: { padding: spacing.md },
+  scroll: { padding: spacing.md, paddingTop: spacing.lg },
+  detailsCard: { padding: spacing.md },
   detailRow: {
     flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start',
     paddingBottom: spacing.sm, marginBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -295,23 +345,37 @@ const styles = StyleSheet.create({
   detailValue: { ...typography.body, color: colors.text, fontWeight: '700', marginTop: 2 },
   detailSub: { ...typography.caption, color: colors.textMuted, marginTop: 1 },
   priceRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md,
+    shadowColor: colors.primary, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
   },
-  priceLabel: { ...typography.body, color: colors.textMuted },
+  priceIconWrap: {
+    width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primarySoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  priceLabel: { ...typography.body, color: colors.textMuted, flex: 1 },
   priceValue: { ...typography.h2, color: colors.primary, fontWeight: '800' },
-  actionRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  // Both rows below (Reject | Accept, and Back | Confirm Reject) pair one bordered
+  // secondary action with one solid PrimaryButton — sized and spaced identically
+  // (same paddingVertical, same icon size, same icon-text gap, same font size) so
+  // the two states of this action area read as one consistent button group.
+  actionRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
   rejectBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    paddingHorizontal: spacing.md, paddingVertical: 14,
     borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.danger, backgroundColor: colors.dangerLight,
   },
-  rejectBtnText: { color: colors.danger, fontWeight: '700', fontSize: 15 },
+  rejectBtnText: { color: colors.danger, fontWeight: '700', fontSize: 16 },
   reasonTitle: { ...typography.body, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
   reasonInput: {
     backgroundColor: colors.background, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: spacing.md, paddingVertical: 12, fontSize: 14, color: colors.text,
     minHeight: 70, textAlignVertical: 'top', marginBottom: spacing.sm,
   },
-  cancelReasonBtn: { paddingHorizontal: spacing.md, paddingVertical: 14 },
-  cancelReasonText: { color: colors.textMuted, fontWeight: '700' },
+  cancelReasonBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    paddingHorizontal: spacing.md, paddingVertical: 14,
+    borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.background,
+  },
+  cancelReasonText: { color: colors.textMuted, fontWeight: '700', fontSize: 16 },
 });

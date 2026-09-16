@@ -17,4 +17,12 @@ export const NotificationApi = {
     apiClient.post<VendorNotification>(ENDPOINTS.notifications.markRead(id)).then((r) => r.data),
 
   markAllRead: () => apiClient.post<void>(ENDPOINTS.notifications.markAllRead),
+
+  /** Registers this device's raw APNs token — see ApnsPushService on the backend. */
+  registerPushToken: (token: string) =>
+    apiClient.post<void>(ENDPOINTS.notifications.pushToken, { token }),
+
+  /** Called on logout so a signed-out device stops receiving this account's pushes. */
+  unregisterPushToken: (token: string) =>
+    apiClient.delete<void>(ENDPOINTS.notifications.pushToken, { data: { token } }),
 };

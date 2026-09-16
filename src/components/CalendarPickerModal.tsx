@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTH_LABELS = [
@@ -30,6 +31,8 @@ function parseIso(iso: string): Date {
 
 /** Lightweight, dependency-free month-grid calendar for picking any date (not just a nearby range). */
 export default function CalendarPickerModal({ visible, selectedDate, markedDates, minDate, onClose, onSelect }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [viewMonth, setViewMonth] = useState(() => parseIso(selectedDate));
 
   useEffect(() => {
@@ -115,7 +118,7 @@ export default function CalendarPickerModal({ visible, selectedDate, markedDates
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(15,42,68,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   card: { width: '100%', maxWidth: 380, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },

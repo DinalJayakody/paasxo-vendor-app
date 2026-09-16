@@ -2,6 +2,12 @@ import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
 import { RegisterPayload } from '@/types';
 
+// Same Firebase project as the sibling User App (paasxo-a3769) — a Web API
+// key is not a secret (it only identifies the Firebase project to Google's
+// endpoints; access is still governed by Firebase Auth/rules), so it's safe
+// to ship in the client the same way the User App already does.
+const FIREBASE_WEB_API_KEY = 'AIzaSyBPw64jTzdD2SYrUje39tC5TGp8qiwzRhI';
+
 export interface UserDtoData {
   id: string;
   firebaseUid: string;
@@ -11,10 +17,12 @@ export interface UserDtoData {
   profileImageUrl: string | null;
   authProvider: string | null;
   emailVerified: boolean | null;
-  accountType: 'USER' | 'VENDOR';
+  accountType: 'USER' | 'VENDOR' | 'TRAINER' | 'ADMIN';
   sports: string[] | null;
   skillLevel: string | null;
   locationAccess: boolean | null;
+  // false only for a VENDOR pending manual verification — see authStore.register().
+  active?: boolean | null;
 }
 
 export interface AuthResponseData {
@@ -82,4 +90,27 @@ export const AuthApi = {
     apiClient
       .post<AuthResponseData>(ENDPOINTS.auth.refreshToken, { refreshToken })
       .then((r) => r.data),
+
+  /** Permanently deletes the signed-in user's account — App Store Guideline 5.1.1(v). */
+  deleteAccount: () => apiClient.delete(ENDPOINTS.auth.deleteAccount).then((r) => r.data),
+
+  /**
+   * Firebase's own password-reset email, called directly against the Identity
+   * Toolkit REST API (no SDK needed) — same Firebase project (paasxo-a3769)
+   * the backend proxies auth through. Independent of the backend being up.
+   */
+  sendPasswordReset: (email: string) =>
+    fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_WEB_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
+      },
+    ).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message ?? 'Could not send reset email');
+      }
+    }),
 };

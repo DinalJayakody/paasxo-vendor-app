@@ -4,9 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import GradientBackground from './GradientBackground';
-import FloatingOrbs from './FloatingOrbs';
 
 interface Props {
   title: string;
@@ -16,23 +16,23 @@ interface Props {
   /** Reduces vertical padding for a more compact banner (e.g. sub-pages). */
   compact?: boolean;
   style?: ViewStyle;
+  /** Override the default blue hero gradient — e.g. paletteForRole('TRAINER') for Trainer screens. */
+  heroColors?: [string, string, string];
 }
 
-/** Reusable primary-gradient hero header with rounded bottom corners and drifting orbs, used atop every main screen. */
+/** Reusable primary-gradient hero header with rounded bottom corners, used atop every main screen. */
 export default function ScreenHeader({
-  title, subtitle, onBack, rightElement, compact, children, style,
+  title, subtitle, onBack, rightElement, compact, children, style, heroColors,
 }: PropsWithChildren<Props>) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const [gradStart, gradMid, gradEnd] = heroColors ?? [colors.heroStart, colors.heroMid, colors.heroEnd];
 
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top + spacing.sm }, compact && styles.compact, style]}>
+    <View style={[styles.wrap, { paddingTop: insets.top + spacing.sm, backgroundColor: gradStart }, compact && styles.compact, style]}>
       <StatusBar style="light" />
-      <GradientBackground colors={[colors.heroStart, colors.heroMid, colors.heroEnd]} />
-      <FloatingOrbs
-        width={400}
-        height={compact ? 160 : 240}
-        colors={['#FFFFFF', colors.primaryLight, colors.premium]}
-      />
+      <GradientBackground colors={[gradStart, gradMid, gradEnd]} />
       <Animated.View entering={FadeInDown.duration(450).springify()}>
         <View style={styles.topRow}>
           {onBack ? (
@@ -52,7 +52,7 @@ export default function ScreenHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,

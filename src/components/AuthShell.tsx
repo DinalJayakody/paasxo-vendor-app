@@ -4,10 +4,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import GradientBackground from './GradientBackground';
-import FloatingOrbs from './FloatingOrbs';
 import Mascot from './Mascot';
 
 interface Props {
@@ -16,21 +15,41 @@ interface Props {
   footer?: React.ReactNode;
 }
 
-/** Shared light-gradient + floating-orb + mascot backdrop used by Login and Register. */
+/** Shared light-gradient + still-mascot backdrop used by Login and Register.
+ *  No FloatingOrbs and no animated mascot here — see the comment below on
+ *  why continuous animation is avoided on this screen specifically. */
 export default function AuthShell({ title, subtitle, footer, children }: PropsWithChildren<Props>) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
       <GradientBackground colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]} />
-      <FloatingOrbs colors={[colors.orb1, colors.orb2, colors.orb3]} />
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <Animated.View entering={FadeIn.duration(500).delay(80)} style={styles.mascotWrap}>
-              <Mascot pose="wave" size={92} />
-            </Animated.View>
+          {/* "always", not "handled" — "handled" only forwards a touch to a
+              child the ScrollView recognizes as already handling it (i.e.
+              Touchable/Pressable, which is why the Sign In button always
+              worked on the first tap). A bare TextInput isn't reliably
+              recognized that way, so the ScrollView's own scroll responder
+              was intercepting the touch instead of letting it reach the
+              input — the field would flash briefly then never actually
+              become focused. */}
+          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="always">
+            {/* Plain Views throughout, not Animated.View — any Reanimated
+                entering/exiting (layout) animation on this screen, even on an
+                unrelated sibling like the mascot or logo, forces a Fabric
+                mount-commit when it finishes. That commit can recreate the
+                native TextInput view that currently has focus, which drops
+                focus and closes the keyboard — repeated taps race repeated
+                commits until they finally settle. Login/Register need the
+                keyboard to respond on the first tap more than they need a
+                fade-in, so no layout animations live here at all. */}
+            <View style={styles.mascotWrap}>
+              <Mascot pose="wave" size={92} animated={false} />
+            </View>
 
-            <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.logoWrap}>
+            <View style={styles.logoWrap}>
               <View style={styles.logoBadge}>
                 <Image
                   source={require('../../assets/logo.jpeg')}
@@ -40,11 +59,11 @@ export default function AuthShell({ title, subtitle, footer, children }: PropsWi
               </View>
               <Text style={styles.title}>{title}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>
-            </Animated.View>
+            </View>
 
-            <Animated.View entering={FadeInUp.duration(650).delay(120).springify()} style={styles.formCard}>
+            <View style={styles.formCard}>
               {children}
-            </Animated.View>
+            </View>
 
             {footer}
           </ScrollView>
@@ -54,7 +73,7 @@ export default function AuthShell({ title, subtitle, footer, children }: PropsWi
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.gradientStart },
   safe: { flex: 1 },
   scroll: { flexGrow: 1, padding: spacing.lg, justifyContent: 'center' },

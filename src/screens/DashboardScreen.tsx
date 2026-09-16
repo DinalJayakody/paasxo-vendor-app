@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { Venue, VendorBooking } from '@/types';
 import { FutsalApi } from '@/api/futsal';
 import { BookingApi } from '@/api/booking';
@@ -14,6 +15,8 @@ import PrimaryButton from '@/components/PrimaryButton';
 import ScreenHeader from '@/components/ScreenHeader';
 import StatCard from '@/components/StatCard';
 import EmptyState from '@/components/EmptyState';
+import ScreenGlow from '@/components/ScreenGlow';
+import { useGlassTabBarHeight } from '@/components/GlassTabBar';
 import { useAuthStore } from '@/store/authStore';
 
 function openInMaps(latitude?: number, longitude?: number) {
@@ -23,6 +26,9 @@ function openInMaps(latitude?: number, longitude?: number) {
 
 /** My Venues (real venues owned by the vendor, from GET /futsals/mine) + real booking-derived stats. */
 export default function DashboardScreen({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const tabBarHeight = useGlassTabBarHeight();
   const user = useAuthStore((s) => s.user);
   const {
     data: venues, isLoading: loadingVenues, refetch: refetchVenues, isRefetching: refetchingVenues,
@@ -57,6 +63,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   return (
     <View style={styles.safe}>
+      <ScreenGlow />
       <ScreenHeader
         title={user?.displayName ?? 'Venue Manager'}
         subtitle="Welcome back — here's your venue overview."
@@ -90,7 +97,7 @@ export default function DashboardScreen({ navigation }: any) {
       </ScreenHeader>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight }]}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} colors={[colors.primary]} />}
       >
         <Text style={styles.sectionTitle}>My Venues</Text>
@@ -109,8 +116,11 @@ export default function DashboardScreen({ navigation }: any) {
             <Animated.View key={venue.id} entering={FadeInUp.duration(450).delay(index * 90).springify()}>
               <Card style={styles.venueCard}>
                 <View style={styles.venueImageWrap}>
-                  {venue.imageBase64 ? (
-                    <Image source={{ uri: `data:image/jpeg;base64,${venue.imageBase64}` }} style={styles.venueImage} />
+                  {venue.imageUrl || venue.imageBase64 ? (
+                    <Image
+                      source={{ uri: venue.imageUrl || `data:image/jpeg;base64,${venue.imageBase64}` }}
+                      style={styles.venueImage}
+                    />
                   ) : (
                     <View style={[styles.venueImage, styles.venueImagePlaceholder]} />
                   )}
@@ -194,7 +204,7 @@ export default function DashboardScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   headerLogo: { width: 40, height: 40, borderRadius: 12, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },

@@ -4,7 +4,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle, useAnimatedProps, withRepeat, withSequence, withTiming, Easing,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Ellipse, Circle, Path, G } from 'react-native-svg';
-import { colors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 
@@ -14,14 +14,24 @@ interface Props {
   pose?: MascotPose;
   size?: number;
   style?: ViewStyle;
+  /** [light, mid, dark] override — defaults to the blue Vendor palette. Pass the orange Trainer trio for role-flavored screens. */
+  accentColors?: [string, string, string];
+  /** Set false to render a still frame with no looping UI-thread animation —
+   *  e.g. on the Login/Register screen, where every bit of continuous main-
+   *  thread work competes with the keyboard-focus handshake right as the
+   *  screen appears. Defaults true everywhere else. */
+  animated?: boolean;
 }
 
 /** Hand-drawn friendly mascot (SVG shapes, no external image assets) used on auth screens and empty states. */
-export default function Mascot({ pose = 'wave', size = 140, style }: Props) {
+export default function Mascot({ pose = 'wave', size = 140, style, accentColors, animated = true }: Props) {
+  const { colors } = useTheme();
+  const [bodyLight, bodyMid, bodyDark] = accentColors ?? [colors.primaryLight, colors.primary, colors.primaryDark];
   const bob = useSharedValue(0);
   const wave = useSharedValue(0);
 
   useEffect(() => {
+    if (!animated) return;
     bob.value = withRepeat(
       withSequence(
         withTiming(-6, { duration: 1400, easing: Easing.inOut(Easing.sin) }),
@@ -40,7 +50,7 @@ export default function Mascot({ pose = 'wave', size = 140, style }: Props) {
         true,
       );
     }
-  }, [pose]);
+  }, [pose, animated]);
 
   const bobStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: bob.value }],
@@ -57,9 +67,9 @@ export default function Mascot({ pose = 'wave', size = 140, style }: Props) {
       <Svg width={size} height={size} viewBox="0 0 200 200">
         <Defs>
           <LinearGradient id="mascotBody" x1="20%" y1="0%" x2="90%" y2="100%">
-            <Stop offset="0%" stopColor={colors.primaryLight} />
-            <Stop offset="55%" stopColor={colors.primary} />
-            <Stop offset="100%" stopColor={colors.primaryDark} />
+            <Stop offset="0%" stopColor={bodyLight} />
+            <Stop offset="55%" stopColor={bodyMid} />
+            <Stop offset="100%" stopColor={bodyDark} />
           </LinearGradient>
         </Defs>
 

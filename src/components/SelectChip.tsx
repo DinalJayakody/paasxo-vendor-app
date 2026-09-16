@@ -1,7 +1,8 @@
 import React from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Props {
   label: string;
@@ -11,6 +12,8 @@ interface Props {
 
 /** Toggleable pill chip in the app's light theme. */
 export default function SelectChip({ label, selected, onPress }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -23,7 +26,7 @@ export default function SelectChip({ label, selected, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

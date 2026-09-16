@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 function useCountUp(target: number, duration = 900) {
   const [value, setValue] = useState(0);
@@ -37,8 +38,11 @@ interface Props {
 
 /** Animated stat tile with a count-up value, icon badge, and gradient accent bar. */
 export default function StatCard({
-  icon, label, value, prefix = '', suffix = '', decimals = 0, sub, accent = colors.primary, delay = 0, style,
+  icon, label, value, prefix = '', suffix = '', decimals = 0, sub, accent: accentProp, delay = 0, style,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const accent = accentProp ?? colors.primary;
   const animated = useCountUp(value);
   const formatted = decimals > 0
     ? animated.toFixed(decimals)
@@ -59,7 +63,7 @@ export default function StatCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surface,

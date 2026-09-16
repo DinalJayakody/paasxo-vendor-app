@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, TextInput, TextInputProps, StyleSheet, TouchableOpacity } from 'react-native';
+import { TextInput, TextInputProps, StyleSheet, TouchableOpacity } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Props extends TextInputProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -9,20 +11,45 @@ interface Props extends TextInputProps {
   error?: boolean;
 }
 
-/** Light, rounded input with a leading icon and animated focus ring, used across the app's forms. */
+/**
+ * Light, rounded input with a leading icon and animated focus ring, used
+ * across the app's forms.
+ *
+ * The focus ring is driven by a Reanimated shared value mutated directly on
+ * the UI thread (onFocus/onBlur just set `focused.value`, no `setState`) —
+ * not by React state. A React state update here would re-render and commit
+ * the wrapping View on every focus/blur, and on the New Architecture that
+ * commit can happen inside the very same event that just gave the TextInput
+ * focus, recreating its native view and immediately dropping the focus it
+ * was just granted. Keeping the highlight UI-thread-only avoids that commit
+ * entirely, the same way PrimaryButton's press animation never re-renders.
+ */
 export default function FormInput({ icon, isPassword, error, style, onFocus, onBlur, ...rest }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [visible, setVisible] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const focused = useSharedValue(0);
+
+  const animatedWrapStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(focused.value, [0, 1], [colors.border, colors.primary]),
+    backgroundColor: interpolateColor(focused.value, [0, 1], [colors.primarySoft, colors.surface]),
+  }));
 
   return (
-    <View style={[styles.wrap, focused && styles.wrapFocused, error && styles.wrapError]}>
-      <Ionicons name={icon} size={18} color={focused ? colors.primary : colors.textMuted} style={styles.icon} />
+    <Animated.View style={[styles.wrap, animatedWrapStyle, error && styles.wrapError]}>
+      <Ionicons name={icon} size={18} color={colors.textMuted} style={styles.icon} />
       <TextInput
         style={[styles.input, style]}
         placeholderTextColor={colors.textMuted}
         secureTextEntry={isPassword && !visible}
-        onFocus={(e) => { setFocused(true); onFocus?.(e); }}
-        onBlur={(e) => { setFocused(false); onBlur?.(e); }}
+        onFocus={(e) => {
+          focused.value = withTiming(1, { duration: 150 });
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          focused.value = withTiming(0, { duration: 150 });
+          onBlur?.(e);
+        }}
         {...rest}
       />
       {isPassword && (
@@ -30,11 +57,11 @@ export default function FormInput({ icon, isPassword, error, style, onFocus, onB
           <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textMuted} />
         </TouchableOpacity>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -44,15 +71,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
-  },
-  wrapFocused: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   wrapError: {
     borderColor: colors.danger,

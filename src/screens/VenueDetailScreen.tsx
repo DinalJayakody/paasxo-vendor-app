@@ -1,15 +1,17 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Animated, {
   FadeIn, FadeInUp, useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, Easing,
 } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import Card from '@/components/Card';
 import PrimaryButton from '@/components/PrimaryButton';
 import EmptyState from '@/components/EmptyState';
+import ScreenGlow from '@/components/ScreenGlow';
 import { FutsalApi } from '@/api/futsal';
 import { BookingApi } from '@/api/booking';
 import { TimeSlot, VendorBooking } from '@/types';
@@ -22,7 +24,7 @@ function timeLabel(time: string) {
   return time.slice(0, 5);
 }
 
-function PulsingDot() {
+function PulsingDot({ styles }: { styles: ReturnType<typeof createStyles> }) {
   const scale = useSharedValue(1);
   useEffect(() => {
     scale.value = withRepeat(
@@ -45,13 +47,41 @@ function PulsingDot() {
 
 /** Venue detail: real venue data, today's live slot snapshot, and upcoming bookings for this venue. */
 export default function VenueDetailScreen({ route, navigation }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { venueId } = route.params;
   const today = todayIso();
+  const queryClient = useQueryClient();
 
   const { data: venue, isLoading: loadingVenue } = useQuery({
     queryKey: ['venue-detail', venueId],
     queryFn: () => FutsalApi.getById(venueId),
   });
+
+  const statusMutation = useMutation({
+    mutationFn: (active: boolean) => FutsalApi.setActive(venueId, active),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['venue-detail', venueId] });
+      queryClient.invalidateQueries({ queryKey: ['vendor-dashboard'] });
+    },
+    onError: (e: any) => Alert.alert('Could not update status', e?.response?.data?.message ?? e?.response?.data?.error ?? 'Please try again'),
+  });
+
+  const confirmToggle = () => {
+    if (!venue) return;
+    const nextActive = !venue.active;
+    Alert.alert(
+      nextActive ? 'Activate venue?' : 'Deactivate venue?',
+      nextActive
+        ? `${venue.name} will be bookable again and appear in search right away.`
+        : `${venue.name} will be hidden from search and can't accept new bookings until reactivated. Existing bookings are unaffected.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: nextActive ? 'Activate' : 'Deactivate', style: nextActive ? 'default' : 'destructive',
+          onPress: () => statusMutation.mutate(nextActive) },
+      ],
+    );
+  };
   const { data: todaySlots, isLoading: loadingSlots } = useQuery({
     queryKey: ['availability', venueId, today],
     queryFn: () => FutsalApi.slotsForDate(venueId, today),
@@ -79,10 +109,14 @@ export default function VenueDetailScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScreenGlow />
       <ScrollView>
         <View style={styles.heroWrap}>
-          {venue.imageBase64 ? (
-            <Image source={{ uri: `data:image/jpeg;base64,${venue.imageBase64}` }} style={styles.hero} />
+          {venue.imageUrl || venue.imageBase64 ? (
+            <Image
+              source={{ uri: venue.imageUrl || `data:image/jpeg;base64,${venue.imageBase64}` }}
+              style={styles.hero}
+            />
           ) : (
             <View style={[styles.hero, { backgroundColor: colors.primaryDark }]} />
           )}
@@ -129,11 +163,25 @@ export default function VenueDetailScreen({ route, navigation }: any) {
             <Card>
               <View style={styles.rowBetween}>
                 <Text style={styles.sectionTitle}>Live Status</Text>
-                <View style={styles.activePill}>
-                  {venue.active && <PulsingDot />}
-                  <Text style={styles.activePillText}>{venue.active ? 'ACTIVE' : 'INACTIVE'}</Text>
-                </View>
+                <TouchableOpacity
+                  onPress={confirmToggle}
+                  disabled={statusMutation.isPending}
+                  style={[styles.activePill, !venue.active && styles.inactivePill]}
+                >
+                  {statusMutation.isPending ? (
+                    <ActivityIndicator size="small" color={venue.active ? colors.success : colors.danger} />
+                  ) : (
+                    <>
+                      {venue.active && <PulsingDot styles={styles} />}
+                      <Text style={[styles.activePillText, !venue.active && styles.inactivePillText]}>
+                        {venue.active ? 'ACTIVE' : 'INACTIVE'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={12} color={venue.active ? colors.success : colors.danger} />
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
+              <Text style={styles.toggleHint}>Tap the status above to {venue.active ? 'deactivate' : 'activate'} this venue.</Text>
               {loadingSlots ? (
                 <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.sm }} />
               ) : (
@@ -186,7 +234,7 @@ export default function VenueDetailScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   heroWrap: { height: 240, backgroundColor: colors.border },
@@ -199,13 +247,19 @@ const styles = StyleSheet.create({
   heroTitle: { ...typography.h2, color: colors.white },
   heroAddressRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   heroAddress: { color: '#E5EEF9' },
+  // colors.glassStrong (not a hardcoded white) — it's the theme's translucent-circle
+  // token and already flips to a dark tint in dark mode, so the colors.text icon
+  // drawn on top (light in dark mode) keeps proper contrast instead of landing on
+  // a plain white disc.
   backFab: {
-    position: 'absolute', top: spacing.md, left: spacing.md, backgroundColor: 'rgba(255,255,255,0.92)',
+    position: 'absolute', top: spacing.md, left: spacing.md, backgroundColor: colors.glassStrong,
     width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.glassBorder,
   },
   editFab: {
-    position: 'absolute', top: spacing.md, right: spacing.md, backgroundColor: 'rgba(255,255,255,0.92)',
+    position: 'absolute', top: spacing.md, right: spacing.md, backgroundColor: colors.glassStrong,
     width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.glassBorder,
   },
   body: { padding: spacing.md },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -223,6 +277,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill,
   },
   activePillText: { color: colors.success, fontWeight: '700', fontSize: 12 },
+  inactivePill: { backgroundColor: colors.dangerLight },
+  inactivePillText: { color: colors.danger },
+  toggleHint: { ...typography.caption, color: colors.textMuted, marginTop: 6, textAlign: 'right' },
   dotWrap: { width: 8, height: 8, alignItems: 'center', justifyContent: 'center' },
   dotCore: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success, position: 'absolute' },
   dotPulse: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },

@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import Card from '@/components/Card';
 import ScreenHeader from '@/components/ScreenHeader';
 import EmptyState from '@/components/EmptyState';
+import ScreenGlow from '@/components/ScreenGlow';
 import { NotificationApi } from '@/api/notification';
 import { VendorNotification } from '@/types';
 
@@ -30,6 +32,8 @@ function notificationIcon(type: string): keyof typeof Ionicons.glyphMap {
 /** Vendor's in-app notification feed — same shared backend feed the User App reads,
  *  scoped to this vendor's Firebase UID (new booking requests land here). */
 export default function NotificationsScreen({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -65,6 +69,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
   return (
     <View style={styles.safe}>
+      <ScreenGlow />
       <ScreenHeader
         title="Notifications"
         subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'You’re all caught up'}
@@ -77,7 +82,12 @@ export default function NotificationsScreen({ navigation }: any) {
             </TouchableOpacity>
           ) : undefined
         }
-      />
+      >
+        {/* Small guide line — this is the vendor's own inbox, distinct from the
+            player app's Feed/Explore notification bells, so it's worth spelling
+            out what actually lands here. */}
+        <Text style={styles.guideText}>New booking requests and venue updates land here</Text>
+      </ScreenHeader>
 
       {isLoading ? (
         <View style={styles.center}>
@@ -124,11 +134,12 @@ export default function NotificationsScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   scroll: { padding: spacing.md },
   markAllText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  guideText: { ...typography.caption, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   notifCard: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginBottom: spacing.sm },
   notifCardUnread: { borderWidth: 1, borderColor: colors.warning + '40', backgroundColor: colors.warningLight + '55' },
   iconWrap: {

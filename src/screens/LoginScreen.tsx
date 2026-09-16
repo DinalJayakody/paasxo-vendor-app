@@ -1,19 +1,35 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '@/theme';
+import { spacing, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import PrimaryButton from '@/components/PrimaryButton';
 import AuthShell from '@/components/AuthShell';
 import FormInput from '@/components/FormInput';
 import { useAuthStore } from '@/store/authStore';
+import { AuthApi } from '@/api/auth';
 
 /**
- * Real Google sign-in requires native Firebase SDK setup (expo-auth-session
- * or @react-native-firebase/auth) which depends on your Firebase project
- * config (paasxo-a3769) - wire that in where marked below. Once wired, call
- * loginWithGoogle(realFirebaseIdToken), which hits POST /auth/login-google.
+ * The backend tags a blocked-vendor login with a `code` (see
+ * VendorPendingVerificationException.Code) precisely so this screen can show
+ * the right title/tone instead of a generic "Sign in failed" for what's
+ * actually two very different situations — a fresh registration still
+ * awaiting review vs. an account an admin has since deactivated.
  */
+function describeSignInError(e: any): { title: string; message: string } {
+  const code = e?.response?.data?.code;
+  const message = e?.response?.data?.error ?? e?.response?.data?.message ?? 'Please check your credentials';
+  if (code === 'DEACTIVATED') {
+    return { title: 'Account Temporarily Deactivated', message };
+  }
+  if (code === 'PENDING_VERIFICATION') {
+    return { title: 'Verification Pending', message };
+  }
+  return { title: 'Sign in failed', message };
+}
+
 export default function LoginScreen({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,16 +44,21 @@ export default function LoginScreen({ navigation }: any) {
     try {
       await loginWithEmailPassword(email.trim().toLowerCase(), password);
     } catch (e: any) {
-      Alert.alert('Sign in failed', e?.response?.data?.error ?? e?.response?.data?.message ?? 'Please check your credentials');
+      const { title, message } = describeSignInError(e);
+      Alert.alert(title, message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSocialSignIn = (provider: 'Google' | 'Apple') => {
-    // TODO: integrate expo-auth-session / native Firebase social auth,
-    // then call loginWithGoogle(realFirebaseIdToken).
-    Alert.alert(`${provider} sign-in`, 'Wire up native Firebase social auth here, then call loginWithGoogle().');
+  const handleForgotPassword = () => {
+    if (!email.trim()) {
+      Alert.alert('Enter your email', 'Type your account email above first, then tap "Forgot password?" again.');
+      return;
+    }
+    AuthApi.sendPasswordReset(email.trim().toLowerCase())
+      .then(() => Alert.alert('Check your email', `We sent a password reset link to ${email.trim()}.`))
+      .catch((e: any) => Alert.alert('Could not send reset email', e?.message ?? 'Please try again.'));
   };
 
   return (
@@ -57,6 +78,8 @@ export default function LoginScreen({ navigation }: any) {
         placeholder="you@example.com"
         autoCapitalize="none"
         keyboardType="email-address"
+        textContentType="username"
+        autoComplete="email"
         value={email}
         onChangeText={setEmail}
       />
@@ -64,51 +87,24 @@ export default function LoginScreen({ navigation }: any) {
         icon="lock-closed-outline"
         placeholder="Password"
         isPassword
+        textContentType="password"
+        autoComplete="current-password"
         value={password}
         onChangeText={setPassword}
       />
 
-      <TouchableOpacity
-        onPress={() => Alert.alert('Forgot password', 'Hook up password-reset flow here.')}
-        style={styles.forgotWrap}
-      >
+      <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotWrap}>
         <Text style={styles.forgot}>Forgot password?</Text>
       </TouchableOpacity>
 
       <PrimaryButton title="Sign In" onPress={handleSignIn} loading={loading} style={{ marginTop: spacing.sm }} />
-
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      <View style={styles.socialRow}>
-        <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialSignIn('Google')}>
-          <Ionicons name="logo-google" size={16} color={colors.text} />
-          <Text style={styles.socialText}>Google</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialSignIn('Apple')}>
-          <Ionicons name="logo-apple" size={16} color={colors.text} />
-          <Text style={styles.socialText}>Apple</Text>
-        </TouchableOpacity>
-      </View>
     </AuthShell>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   forgotWrap: { alignSelf: 'flex-end', marginBottom: spacing.xs, marginTop: -4 },
   forgot: { color: colors.primary, fontWeight: '600', fontSize: 13 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerText: { marginHorizontal: spacing.sm, color: colors.textMuted, fontSize: 11, fontWeight: '600' },
-  socialRow: { flexDirection: 'row', gap: spacing.sm },
-  socialButton: {
-    flex: 1, flexDirection: 'row', gap: 8, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12,
-    paddingVertical: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface,
-  },
-  socialText: { fontWeight: '700', color: colors.text },
   footerText: { textAlign: 'center', color: colors.textMuted, marginTop: spacing.lg },
   link: { color: colors.primary, fontWeight: '700' },
 });

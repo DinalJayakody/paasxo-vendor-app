@@ -4,8 +4,10 @@ export interface Venue {
   name: string;
   location: string;
   description?: string;
-  imageUrl?: string;
-  imageBase64?: string; // raw base64, no data: prefix — build a data URI to render it
+  imageUrl?: string; // Cloudflare R2 URL — the only shape new venues have
+  imageBase64?: string; // legacy fallback for venues created before the R2 cutover
+  sports?: BackendSport[];
+  businessRegistrationId?: number;
   pricePerSlot: number;
   openTime: string; // "HH:mm:ss"
   closeTime: string; // "HH:mm:ss"
@@ -13,6 +15,24 @@ export interface Venue {
   active: boolean;
   latitude?: number;
   longitude?: number;
+}
+
+/** Mirrors mobile-app-paasxo's BusinessRegistrationResponse. */
+export interface BusinessRegistration {
+  id: number;
+  registrationNumber: string;
+  businessName: string;
+  documentUrl?: string; // Cloudflare R2 URL
+  // Set only in the response right after create() when a document was attached
+  // but couldn't be processed (too large / unreadable format) — the registration
+  // itself still saved fine, this just says the photo didn't come along.
+  documentSkippedReason?: string;
+  createdAt: string;
+}
+
+export interface CreateBusinessRegistrationPayload {
+  registrationNumber: string;
+  businessName: string;
 }
 
 export type SlotStatus = 'AVAILABLE' | 'PENDING_VENDOR' | 'BOOKED' | 'BLOCKED';
@@ -108,6 +128,43 @@ export interface PaymentItem {
   createdAt: string;
 }
 
+/** One settled booking's owed-to-vendor amount — mirrors backend PayoutResponse.
+ *  DUE = owed but not yet paid; PAID = admin confirmed the bank transfer was made
+ *  (manually, outside the app — see the Payouts screen's guide copy); VOIDED = the
+ *  booking was cancelled after settlement but before payout, so nothing is owed. */
+export interface Payout {
+  id: number;
+  bookingId: number;
+  bookingTitle: string | null;
+  futsalName: string | null;
+  slotDate: string | null;
+  grossAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
+  netPayoutAmount: number;
+  status: 'DUE' | 'PAID' | 'VOIDED';
+  dueAt: string;
+  paidAt: string | null;
+  paidReference: string | null;
+}
+
+/** accountNumberMasked only ever shows the last 4 digits — see VendorBankAccountController. */
+export interface VendorBankAccount {
+  id: number;
+  bankName: string;
+  branchName: string;
+  accountHolderName: string;
+  accountNumberMasked: string;
+  updatedAt: string;
+}
+
+export interface VendorBankAccountPayload {
+  bankName: string;
+  branchName: string;
+  accountHolderName: string;
+  accountNumber: string;
+}
+
 export interface Subscription {
   id: number;
   planType: 'FREE' | 'STARTER' | 'PRO' | 'ENTERPRISE';
@@ -123,28 +180,191 @@ export interface AuthUser {
   displayName: string;
   phoneNumber?: string;
   profileImageUrl?: string;
-  accountType: 'USER' | 'VENDOR';
+  accountType: 'USER' | 'VENDOR' | 'TRAINER' | 'ADMIN';
   sports?: string[];
+  // false only for a VENDOR pending manual verification (see AuthService#assertVendorActive) —
+  // always true for USER/TRAINER/ADMIN.
+  active?: boolean;
 }
 
-/** Payload sent to POST /auth/register. Vendor app always pins accountType to 'VENDOR'. */
+/** Mirrors mobile-app-paasxo's AdminVendorSummaryResponse — one row of the admin vendor list. */
+export interface AdminVendorSummary {
+  firebaseUid: string;
+  displayName: string;
+  email: string;
+  phoneNumber?: string;
+  profileImageUrl?: string;
+  active: boolean;
+  createdAt: string;
+  venueCount: number;
+  bookingCount: number;
+  totalDue: number;
+}
+
+/** Mirrors mobile-app-paasxo's AdminVenueFinancialsResponse — one venue's revenue/commission/due/paid summary. */
+export interface AdminVenueFinancials {
+  futsalId: number;
+  futsalName: string;
+  // Null = no venue-specific override set; falls back to effectiveCommissionRate.
+  commissionRate: number | null;
+  effectiveCommissionRate: number;
+  bookingCount: number;
+  totalRevenue: number;
+  totalCommissionEarned: number;
+  totalDue: number;
+  totalPaid: number;
+}
+
+/** Mirrors mobile-app-paasxo's AdminVendorDetailResponse — full vendor detail for the admin console. */
+export interface AdminVendorDetail {
+  firebaseUid: string;
+  displayName: string;
+  email: string;
+  phoneNumber?: string;
+  profileImageUrl?: string;
+  active: boolean;
+  createdAt: string;
+  sports?: string[];
+  businessRegistrations: BusinessRegistration[];
+  venues: Venue[];
+  bookings: VendorBooking[];
+  payments: PaymentItem[];
+  payouts: Payout[];
+  venueFinancials: AdminVenueFinancials[];
+  totalRevenue: number;
+  totalCommissionEarned: number;
+  totalDue: number;
+  totalPaid: number;
+}
+
+/** Payload sent to POST /auth/register. This app registers either Vendor or Trainer accounts. */
 export interface RegisterPayload {
   email: string;
   password: string;
   displayName: string;
   phoneNumber?: string;
-  accountType: 'VENDOR';
+  accountType: 'VENDOR' | 'TRAINER';
   sports?: string[];
+}
+
+// ─── Trainer domain — mirrors mobile-app-paasxo's dto.trainer.* responses exactly ──────
+
+export type TrainerCategory =
+  | 'GYM' | 'CALISTHENICS' | 'DANCING' | 'YOGA' | 'CROSSFIT' | 'MARTIAL_ARTS' | 'PILATES' | 'OTHER';
+
+export interface TrainerProfile {
+  id: number;
+  trainerFirebaseUid: string;
+  trainerDisplayName?: string;
+  trainerAvatarUrl?: string;
+  categories: TrainerCategory[];
+  bio?: string;
+  certifications?: string;
+  experienceYears?: number;
+  hourlyRate?: number;
+  profileImageUrl?: string;
+  coverImageUrl?: string;
+  galleryImageUrls?: string[];
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  active: boolean;
+  sessionCount?: number;
+}
+
+export interface UpsertTrainerProfilePayload {
+  categories: TrainerCategory[];
+  bio?: string;
+  certifications?: string;
+  experienceYears?: number;
+  hourlyRate?: number;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export type DayOfWeekName =
+  | 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
+export interface TrainerSession {
+  id: number;
+  trainerFirebaseUid: string;
+  trainerDisplayName?: string;
+  trainerAvatarUrl?: string;
+  title: string;
+  category: TrainerCategory;
+  description?: string;
+  location?: string;
+  isOnline: boolean;
+  latitude?: number;
+  longitude?: number;
+  price: number;
+  durationMinutes: number;
+  capacity: number;
+  daysOfWeek: DayOfWeekName[];
+  startTime: string; // "HH:mm:ss"
+  planDetails?: string;
+  imageUrl?: string;
+  active: boolean;
+}
+
+export interface CreateSessionPayload {
+  title: string;
+  category: TrainerCategory;
+  description?: string;
+  location?: string;
+  isOnline?: boolean;
+  latitude?: number;
+  longitude?: number;
+  price: number;
+  durationMinutes: number;
+  capacity: number;
+  daysOfWeek: DayOfWeekName[];
+  startTime: string; // "HH:mm:ss"
+  planDetails?: string;
+}
+
+export type TrainerSessionSlotStatus = 'OPEN' | 'FULL' | 'CANCELLED';
+
+export interface TrainerSessionSlot {
+  id: number;
+  trainerSessionId: number;
+  slotDate: string; // "YYYY-MM-DD"
+  startTime: string;
+  endTime: string;
+  capacity: number;
+  bookedCount: number;
+  spotsLeft: number;
+  status: TrainerSessionSlotStatus;
+}
+
+export type TrainerBookingStatus = 'CONFIRMED' | 'CANCELLED';
+
+export interface TrainerBooking {
+  id: number;
+  userId: string;
+  userDisplayName?: string;
+  userAvatarUrl?: string;
+  slotId: number;
+  sessionId: number;
+  sessionTitle: string;
+  trainerFirebaseUid: string;
+  trainerDisplayName?: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  status: TrainerBookingStatus;
+  pricePaid?: number;
+  bookedAt: string;
 }
 
 export type SportType = 'Futsal' | 'Cricket' | 'Pickleball' | 'Paddleball';
 
-/**
- * Payload sent to POST /futsals. This mirrors the backend's FutsalRequest DTO
- * exactly — it has no sport-tagging field, so the Create Venue screen's sport
- * selector is UI-only for now (every resource created here is a "Futsal" row
- * regardless of which sport card was picked, until the backend adds one).
- */
+/** Mirrors the backend's Sport enum (com.pasxo.dto.enums.Sport) — uppercase values. */
+export type BackendSport = 'FUTSAL' | 'CRICKET' | 'PICKLEBALL' | 'PADDLEBALL';
+
+/** Payload sent to POST /futsals. Mirrors the backend's FutsalRequest DTO. */
 export interface CreateVenuePayload {
   name: string;
   location: string; // main city, derived from the map picker's reverse-geocode
@@ -155,4 +375,8 @@ export interface CreateVenuePayload {
   openTime: string; // "HH:mm:ss"
   closeTime: string; // "HH:mm:ss"
   slotDurationMinutes: number;
+  /** At least one required — a venue can support more than one sport. */
+  sports: BackendSport[];
+  /** Optional — id of an existing BusinessRegistration (see businessRegistration.ts). */
+  businessRegistrationId?: number;
 }

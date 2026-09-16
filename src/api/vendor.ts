@@ -1,18 +1,34 @@
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
-import { PaymentItem, Subscription } from '@/types';
+import { PaymentItem, Payout, Subscription, VendorBankAccount, VendorBankAccountPayload } from '@/types';
 
 // Booking accept/reject/list actions live in BookingApi (api/booking.ts) — the
 // real, confirmed BookingController endpoints — not here. See BookingApi.
+//
+// payments/paymentSummary/payouts/bankAccount below read `r.data` directly
+// (no `.data.data`) — the backend controllers return the DTO straight from
+// ResponseEntity.ok(dto), same convention BookingApi already uses. The old
+// `.data.data` here was never actually correct against a real response; it
+// was written against an endpoint that didn't exist yet (see endpoints.ts).
 
 export const VendorApi = {
   payments: (page = 0, size = 10) =>
     apiClient.get(ENDPOINTS.vendor.payments, { params: { page, size } })
-      .then(r => r.data.data as { content: PaymentItem[]; totalElements: number }),
+      .then(r => r.data as { content: PaymentItem[]; totalElements: number }),
 
   paymentSummary: () =>
     apiClient.get(ENDPOINTS.vendor.paymentSummary)
-      .then(r => r.data.data as { totalRevenue: number; dailyBookingEfficiencyPercent: number; totalTransactions: number }),
+      .then(r => r.data as { totalRevenue: number; dailyBookingEfficiencyPercent: number; totalTransactions: number }),
+
+  /** The vendor's own Payout ledger — what's due/paid for each settled (48h-before-kickoff) booking. */
+  payouts: () =>
+    apiClient.get(ENDPOINTS.vendor.payouts).then(r => r.data as Payout[]),
+
+  bankAccount: () =>
+    apiClient.get(ENDPOINTS.vendor.bankAccount).then(r => r.data as VendorBankAccount | null).catch(() => null),
+
+  saveBankAccount: (payload: VendorBankAccountPayload) =>
+    apiClient.put(ENDPOINTS.vendor.bankAccount, payload).then(r => r.data as VendorBankAccount),
 
   currentSubscription: () =>
     apiClient.get<{ data: Subscription }>(ENDPOINTS.vendor.subscription).then(r => r.data.data).catch(() => null),

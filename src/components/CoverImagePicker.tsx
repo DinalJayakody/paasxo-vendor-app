@@ -2,7 +2,8 @@ import React, { useCallback } from 'react';
 import { View, Image, StyleSheet, TouchableOpacity, Alert, Text } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Props {
   uri?: string;
@@ -12,6 +13,8 @@ interface Props {
 
 /** Wide 16:9 cover-photo picker for venue creation. */
 export default function CoverImagePicker({ uri, onChange, label = 'Add a cover photo' }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const pick = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -46,7 +49,7 @@ export default function CoverImagePicker({ uri, onChange, label = 'Add a cover p
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: {
     width: '100%',
     aspectRatio: 16 / 9,

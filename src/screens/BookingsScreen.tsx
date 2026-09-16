@@ -3,12 +3,15 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 import Card from '@/components/Card';
 import StatusBadge from '@/components/StatusBadge';
 import ScreenHeader from '@/components/ScreenHeader';
 import SelectChip from '@/components/SelectChip';
 import EmptyState from '@/components/EmptyState';
+import ScreenGlow from '@/components/ScreenGlow';
+import { useGlassTabBarHeight } from '@/components/GlassTabBar';
 import { BookingApi } from '@/api/booking';
 import { VendorBooking } from '@/types';
 
@@ -26,6 +29,9 @@ function timeLabel(t?: string) {
 
 /** Booking Management: reads straight from the shared Booking table the User App writes to via POST /bookings. */
 export default function BookingsScreen({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const tabBarHeight = useGlassTabBarHeight();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['vendor-bookings'], queryFn: BookingApi.vendorBookings });
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('ALL');
@@ -53,12 +59,13 @@ export default function BookingsScreen({ navigation }: any) {
 
   return (
     <View style={styles.safe}>
+      <ScreenGlow />
       <ScreenHeader
         title="Bookings"
         subtitle={`${bookings.length} total · ${pendingCount} awaiting review`}
         compact
       />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight }]}>
         <View style={styles.filterRow}>
           {FILTERS.map((f) => (
             <SelectChip key={f} label={FILTER_LABELS[f]} selected={filter === f} onPress={() => setFilter(f)} />
@@ -78,7 +85,7 @@ export default function BookingsScreen({ navigation }: any) {
                   onPress={() => navigation.navigate('BookingRequestDetail', { bookingId: b.id })}
                 >
                   <Card style={[styles.bookingCard, isPending && styles.bookingCardPending]}>
-                    <View style={[styles.accentBar, { backgroundColor: statusAccent(b.status) }]} />
+                    <View style={[styles.accentBar, { backgroundColor: statusAccent(b.status, colors) }]} />
                     <View style={styles.bookingBody}>
                       <View style={styles.rowBetween}>
                         <Text style={styles.customer} numberOfLines={1}>
@@ -119,7 +126,7 @@ export default function BookingsScreen({ navigation }: any) {
   );
 }
 
-function statusAccent(status: string) {
+function statusAccent(status: string, colors: ThemeColors) {
   switch (status) {
     case 'PENDING_VENDOR': return colors.warning;
     case 'ACTIVE_MATCH': return colors.primary;
@@ -128,7 +135,7 @@ function statusAccent(status: string) {
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   scroll: { padding: spacing.md },

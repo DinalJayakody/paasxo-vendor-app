@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { colors, radius, spacing } from '@/theme';
+import { radius, spacing, ThemeColors } from '@/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 interface Props {
   title: string;
@@ -17,6 +18,8 @@ interface Props {
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function PrimaryButton({ title, onPress, loading, variant = 'primary', icon, style, disabled }: Props) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const isOutline = variant === 'outline';
   const isGhost = variant === 'ghost';
   const scale = useSharedValue(1);
@@ -52,7 +55,7 @@ export default function PrimaryButton({ title, onPress, loading, variant = 'prim
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   base: {
     backgroundColor: colors.primary,
     paddingVertical: 14,

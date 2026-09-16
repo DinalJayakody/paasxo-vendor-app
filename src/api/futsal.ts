@@ -68,6 +68,14 @@ export const FutsalApi = {
       .then((r) => r.data);
   },
 
+  /** Active/Inactive toggle for one of the vendor's own venues — plain JSON PATCH,
+   *  no multipart trick needed since there's no file part involved (see create/update above). */
+  setActive: (id: number, active: boolean) =>
+    apiClient.patch<Venue>(ENDPOINTS.futsals.status(id), { active }).then((r) => r.data),
+
+  // Every venue this vendor owns, active AND inactive — a deactivated venue
+  // must stay visible here so it can be switched back on (see backend
+  // FutsalService#getMine's comment for why this isn't active-only).
   getMine: () => apiClient.get<Venue[]>(ENDPOINTS.futsals.mine).then((r) => r.data),
 
   getById: (id: number) => apiClient.get<Venue>(ENDPOINTS.futsals.byId(id)).then((r) => r.data),
