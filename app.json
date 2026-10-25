@@ -13,6 +13,7 @@
     ],
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "5",
       "bundleIdentifier": "com.paasxo.vendor",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -30,7 +31,14 @@
     },
     "scheme": "paasxovendor",
     "plugins": [
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Paasxo Vendor uses your photo library so you can add pictures and videos of your venue, training sessions and profile.",
+          "cameraPermission": "Paasxo Vendor uses your camera so you can photograph your business registration or ID for verification.",
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-location",
         {

@@ -7,6 +7,7 @@ import { useTheme } from '@/context/ThemeContext';
 import Card from '@/components/Card';
 import FormInput from '@/components/FormInput';
 import PrimaryButton from '@/components/PrimaryButton';
+import { useAuthStore } from '@/store/authStore';
 import ScreenHeader from '@/components/ScreenHeader';
 import ScreenGlow from '@/components/ScreenGlow';
 import { VendorApi } from '@/api/vendor';
@@ -18,6 +19,7 @@ import { VendorApi } from '@/api/vendor';
  * details, there's no automated bank transfer yet, so accuracy here matters.
  */
 export default function BankAccountScreen({ navigation }: any) {
+  const isTrainer = useAuthStore((st) => st.user?.accountType) === 'TRAINER';
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const queryClient = useQueryClient();
@@ -64,9 +66,10 @@ export default function BankAccountScreen({ navigation }: any) {
           <View style={styles.guideRow}>
             <Ionicons name="information-circle" size={20} color={colors.info} />
             <Text style={styles.guideText}>
-              For each match, Paasxo holds the full payment safely until 48 hours before kickoff, then
-              settles your share (the total charged, minus Paasxo's 5% platform fee) as a payout. Payouts
-              are currently wired manually by our team once confirmed — make sure these details are
+              {isTrainer
+                ? 'For each session booking and plan sale, Paasxo holds the payment safely until the refund window ends, then settles your share (minus Paasxo\'s platform fee) as a payout.'
+                : 'For each match, Paasxo holds the full payment safely until 48 hours before kickoff, then settles your share (the total charged, minus Paasxo\'s 5% platform fee) as a payout.'}
+              {' '}Payouts are currently wired manually by our team once confirmed — make sure these details are
               accurate so your money reaches the right account.
             </Text>
           </View>

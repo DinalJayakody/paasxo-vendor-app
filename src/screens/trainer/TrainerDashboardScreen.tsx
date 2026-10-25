@@ -19,7 +19,7 @@ import { useGlassTabBarHeight } from '@/components/GlassTabBar';
 import { useAuthStore } from '@/store/authStore';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  GYM: 'Gym', CALISTHENICS: 'Calisthenics', DANCING: 'Dancing', YOGA: 'Yoga',
+  GYM: 'Gym', BODYBUILDING: 'Bodybuilding', CALISTHENICS: 'Calisthenics', ZUMBA: 'Zumba', DANCING: 'Dancing', YOGA: 'Yoga',
   CROSSFIT: 'CrossFit', MARTIAL_ARTS: 'Martial Arts', PILATES: 'Pilates', OTHER: 'Training',
 };
 
@@ -110,6 +110,32 @@ export default function TrainerDashboardScreen({ navigation }: any) {
             <StatCard icon="barbell" label="Active Sessions" value={activeSessions} accent={palette.accent} delay={0} />
             <StatCard icon="people-outline" label="Total Weekly Capacity" value={totalCapacity} accent={colors.teal} delay={60} />
             <StatCard icon="star-outline" label="Specialties" value={profile.categories?.length ?? 0} accent={colors.premium} delay={120} />
+
+            <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('AllDates')}>
+              <Card style={styles.sessionCard}>
+                <View style={[styles.sessionIconBadge, { backgroundColor: palette.accentLight }]}>
+                  <Ionicons name="calendar" size={20} color={palette.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sessionTitle}>All Dates</Text>
+                  <Text style={styles.sessionMeta}>See every upcoming date across your sessions, and who's joined</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('TrainerPlans')}>
+              <Card style={styles.sessionCard}>
+                <View style={[styles.sessionIconBadge, { backgroundColor: palette.accentLight }]}>
+                  <Ionicons name="clipboard" size={20} color={palette.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sessionTitle}>Plans & Memberships</Text>
+                  <Text style={styles.sessionMeta}>Sell workout plans, diet plans and monthly or annual memberships</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Card>
+            </TouchableOpacity>
 
             <View style={styles.rowBetween}>
               <Text style={styles.sectionTitle}>My Sessions</Text>

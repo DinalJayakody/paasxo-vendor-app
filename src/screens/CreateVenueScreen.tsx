@@ -169,8 +169,10 @@ export default function CreateVenueScreen({ navigation, route }: any) {
       queryClient.invalidateQueries({ queryKey: ['vendor-dashboard'] });
       if (isEditing) queryClient.invalidateQueries({ queryKey: ['venue-detail', venueId] });
       Alert.alert(
-        isEditing ? 'Venue updated' : 'Venue created',
-        isEditing ? `${name} has been updated.` : `${name} has been added to your account.`,
+        isEditing ? 'Venue updated' : 'Venue submitted for review',
+        isEditing
+          ? `${name} has been updated.`
+          : `${name} has been added to your account. Paasxo will review it before it appears to players — you'll get a notification once it's live. Meanwhile, add photos, specialities and availability.`,
         [{ text: 'OK', onPress: () => navigation.goBack() }],
       );
     },

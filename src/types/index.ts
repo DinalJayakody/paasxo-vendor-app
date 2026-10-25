@@ -13,8 +13,30 @@ export interface Venue {
   closeTime: string; // "HH:mm:ss"
   slotDurationMinutes: number;
   active: boolean;
+  /** New venues wait for Paasxo to review them before they go live. */
+  pendingReview?: boolean;
+  specialities?: string[];
+  media?: MediaItem[];
+  promotion?: Promotion | null;
   latitude?: number;
   longitude?: number;
+}
+
+/** A marketing discount on a venue or session (V6/T9). Dates are "YYYY-MM-DD". */
+export interface Promotion {
+  discountPercent: number;
+  startsOn?: string | null;
+  endsOn?: string | null;
+  label?: string | null;
+  /** Response only. */
+  activeToday?: boolean;
+}
+
+/** A photo or video in a venue / trainer gallery. */
+export interface MediaItem {
+  url: string;
+  mediaType: 'IMAGE' | 'VIDEO';
+  thumbnailUrl?: string;
 }
 
 /** Mirrors mobile-app-paasxo's BusinessRegistrationResponse. */
@@ -28,6 +50,20 @@ export interface BusinessRegistration {
   // itself still saved fine, this just says the photo didn't come along.
   documentSkippedReason?: string;
   createdAt: string;
+}
+
+export type VerificationDocType =
+  | 'BUSINESS_REGISTRATION' | 'NATIONAL_ID' | 'PASSPORT' | 'DRIVING_LICENCE' | 'COACHING_CERTIFICATE';
+
+/** Mirrors VerificationDocumentResponse — private file, no URL (see api/verificationDocuments.ts). */
+export interface VerificationDocument {
+  id: number;
+  docType: VerificationDocType;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewNote?: string | null;
+  sizeBytes?: number | null;
+  createdAt: string;
+  reviewedAt?: string | null;
 }
 
 export interface CreateBusinessRegistrationPayload {
@@ -118,8 +154,13 @@ export interface VendorNotification {
   createdAt: string;
 }
 
+export type PaymentSourceType = 'BOOKING' | 'TRAINER_SESSION' | 'TRAINER_PLAN';
+
 export interface PaymentItem {
   id: number;
+  // Present on every row from the updated backend; optional only so older
+  // cached responses (before this field existed) don't break the type.
+  sourceType?: PaymentSourceType;
   customerName: string;
   sport: string;
   dateRange: string;
@@ -131,10 +172,13 @@ export interface PaymentItem {
 /** One settled booking's owed-to-vendor amount — mirrors backend PayoutResponse.
  *  DUE = owed but not yet paid; PAID = admin confirmed the bank transfer was made
  *  (manually, outside the app — see the Payouts screen's guide copy); VOIDED = the
- *  booking was cancelled after settlement but before payout, so nothing is owed. */
+ *  booking was cancelled after settlement but before payout, so nothing is owed.
+ *  Exactly one of bookingId/trainerBookingId is set, matching sourceType. */
 export interface Payout {
   id: number;
-  bookingId: number;
+  bookingId?: number;
+  trainerBookingId?: number;
+  sourceType?: PaymentSourceType;
   bookingTitle: string | null;
   futsalName: string | null;
   slotDate: string | null;
@@ -199,6 +243,7 @@ export interface AdminVendorSummary {
   venueCount: number;
   bookingCount: number;
   totalDue: number;
+  accountType?: 'VENDOR' | 'TRAINER';
 }
 
 /** Mirrors mobile-app-paasxo's AdminVenueFinancialsResponse — one venue's revenue/commission/due/paid summary. */
@@ -224,8 +269,10 @@ export interface AdminVendorDetail {
   profileImageUrl?: string;
   active: boolean;
   createdAt: string;
+  accountType?: 'VENDOR' | 'TRAINER';
   sports?: string[];
   businessRegistrations: BusinessRegistration[];
+  verificationDocuments?: VerificationDocument[];
   venues: Venue[];
   bookings: VendorBooking[];
   payments: PaymentItem[];
@@ -250,7 +297,8 @@ export interface RegisterPayload {
 // ─── Trainer domain — mirrors mobile-app-paasxo's dto.trainer.* responses exactly ──────
 
 export type TrainerCategory =
-  | 'GYM' | 'CALISTHENICS' | 'DANCING' | 'YOGA' | 'CROSSFIT' | 'MARTIAL_ARTS' | 'PILATES' | 'OTHER';
+  | 'GYM' | 'CALISTHENICS' | 'DANCING' | 'YOGA' | 'CROSSFIT' | 'MARTIAL_ARTS' | 'PILATES' | 'OTHER'
+  | 'BODYBUILDING' | 'ZUMBA';
 
 export interface TrainerProfile {
   id: number;
@@ -271,6 +319,8 @@ export interface TrainerProfile {
   rating?: number;
   active: boolean;
   sessionCount?: number;
+  specialities?: string[];
+  media?: MediaItem[];
 }
 
 export interface UpsertTrainerProfilePayload {
@@ -300,6 +350,7 @@ export interface TrainerSession {
   latitude?: number;
   longitude?: number;
   price: number;
+  promotion?: Promotion | null;
   durationMinutes: number;
   capacity: number;
   daysOfWeek: DayOfWeekName[];
@@ -330,6 +381,22 @@ export type TrainerSessionSlotStatus = 'OPEN' | 'FULL' | 'CANCELLED';
 export interface TrainerSessionSlot {
   id: number;
   trainerSessionId: number;
+  slotDate: string; // "YYYY-MM-DD"
+  startTime: string;
+  endTime: string;
+  capacity: number;
+  bookedCount: number;
+  spotsLeft: number;
+  status: TrainerSessionSlotStatus;
+}
+
+// One row of the "All Dates" screen — spans every session a trainer owns,
+// so (unlike TrainerSessionSlot) it carries the session's own identity too.
+export interface TrainerSlotOverview {
+  slotId: number;
+  sessionId: number;
+  sessionTitle: string;
+  sessionImageUrl?: string;
   slotDate: string; // "YYYY-MM-DD"
   startTime: string;
   endTime: string;
@@ -379,4 +446,65 @@ export interface CreateVenuePayload {
   sports: BackendSport[];
   /** Optional — id of an existing BusinessRegistration (see businessRegistration.ts). */
   businessRegistrationId?: number;
+}
+
+// ─── Trainer plans (T4 workout, T5 diet, T6 membership) ──────────────────────
+export type TrainerPlanType = 'WORKOUT' | 'DIET' | 'MEMBERSHIP';
+
+export interface TrainerPlan {
+  id: number;
+  trainerFirebaseUid: string;
+  trainerDisplayName?: string;
+  type: TrainerPlanType;
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  price?: number | null;
+  durationWeeks?: number | null;
+  billingPeriod?: 'MONTHLY' | 'ANNUAL' | null;
+  active: boolean;
+  activeBuyers?: number | null;
+  /** WORKOUT/DIET: tailored to each client after they buy (or are given) it. */
+  personalised?: boolean;
+}
+
+export interface TrainerPlanPayload {
+  type: TrainerPlanType;
+  title: string;
+  summary?: string;
+  content?: string;
+  price?: number | null;
+  durationWeeks?: number | null;
+  billingPeriod?: 'MONTHLY' | 'ANNUAL' | null;
+  personalised?: boolean;
+}
+
+export interface TrainerPlanSale {
+  id: number;
+  planId: number;
+  planType: TrainerPlanType;
+  planTitle: string;
+  buyerDisplayName?: string;
+  pricePaid: number;
+  status: 'ACTIVE' | 'CANCELLED';
+  startsAt: string;
+  expiresAt: string;
+  purchasedAt: string;
+  buyerFirebaseUid?: string;
+  /** The plan the trainer wrote for this one client. */
+  personalContent?: string | null;
+  personalUpdatedAt?: string | null;
+  /** What the client told the trainer (goals, allergies, injuries…). */
+  clientNote?: string | null;
+  assignedByTrainer?: boolean;
+  personalised?: boolean | null;
+}
+
+/** Someone who booked the trainer's sessions or holds one of their plans. */
+export interface TrainerCustomer {
+  firebaseUid: string;
+  displayName?: string;
+  profileImageUrl?: string | null;
+  sessionCustomer: boolean;
+  activePlanIds: number[];
 }

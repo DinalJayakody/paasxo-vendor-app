@@ -26,6 +26,8 @@ const CATEGORIES: { key: TrainerCategory; icon: keyof typeof Ionicons.glyphMap; 
   { key: 'YOGA', icon: 'leaf-outline', color: '#0EA5E9' },
   { key: 'CROSSFIT', icon: 'flame-outline', color: '#DC2626' },
   { key: 'MARTIAL_ARTS', icon: 'fitness-outline', color: '#B45309' },
+  { key: 'BODYBUILDING', icon: 'barbell', color: '#475569' },
+  { key: 'ZUMBA', icon: 'musical-note-outline', color: '#DB2777' },
 ];
 
 const DAYS: { key: DayOfWeekName; label: string }[] = [

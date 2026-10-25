@@ -5,6 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import PrimaryButton from '@/components/PrimaryButton';
 import AuthShell from '@/components/AuthShell';
 import FormInput from '@/components/FormInput';
+import { usePendingSession } from '@/store/pendingSession';
 import { useAuthStore } from '@/store/authStore';
 import { AuthApi } from '@/api/auth';
 
@@ -44,6 +45,13 @@ export default function LoginScreen({ navigation }: any) {
     try {
       await loginWithEmailPassword(email.trim().toLowerCase(), password);
     } catch (e: any) {
+      const data = e?.response?.data;
+      if (data?.code === 'PENDING_VERIFICATION' && data?.uploadToken) {
+        // Still under review: no sign-in, but they can add or fix verification documents.
+        usePendingSession.getState().setToken(data.uploadToken);
+        navigation.navigate('PendingVerification', { role: data.accountType === 'TRAINER' ? 'TRAINER' : 'VENDOR', returning: true });
+        return;
+      }
       const { title, message } = describeSignInError(e);
       Alert.alert(title, message);
     } finally {

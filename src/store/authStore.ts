@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { usePendingSession } from './pendingSession';
 import { DeviceEventEmitter } from 'react-native';
 import { storage, AUTH_LOGOUT_EVENT } from '@/api/client';
 import { AuthApi, AuthResponseData } from '@/api/auth';
@@ -95,13 +96,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   register: async (payload, accountType, profileImageUri) => {
     const data = await AuthApi.register({ ...payload, accountType }, profileImageUri);
-    // A freshly-registered VENDOR is created inactive pending manual verification
-    // (see AuthService#register) — their Firebase account exists so the same
-    // credentials work once approved, but they must NOT be signed into the app
-    // yet. Trainer registration is unaffected (always active: true).
-    if (accountType === 'VENDOR' && data.user.active === false) {
+    // A freshly-registered VENDOR or TRAINER is created inactive pending manual
+    // verification (see AuthService#register) — their Firebase account exists so
+    // the same credentials work once approved, but they must NOT be signed into
+    // the app yet.
+    if (data.user.active === false) {
+      // In memory only, so they can add verification documents on the next screen.
+      usePendingSession.getState().setToken(data.idToken);
       return { pending: true };
     }
+    usePendingSession.getState().setToken(null);
     const user = await persistSession(data);
     set({ user, isAuthenticated: true });
     return { pending: false };
@@ -109,6 +113,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   loginWithEmailPassword: async (email: string, password: string) => {
     const data = await AuthApi.login(email, password);
+    usePendingSession.getState().setToken(null);
     const user = await persistSession(data);
     set({ user, isAuthenticated: true });
   },

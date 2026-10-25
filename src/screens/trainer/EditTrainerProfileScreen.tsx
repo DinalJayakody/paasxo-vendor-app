@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import { radius, spacing, typography, ThemeColors } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { useRoleTheme } from '@/hooks/useRoleTheme';
 import { TrainerApi } from '@/api/trainer';
-import { TrainerCategory, UpsertTrainerProfilePayload } from '@/types';
+import { TrainerCategory, TrainerProfile, UpsertTrainerProfilePayload } from '@/types';
 import Card from '@/components/Card';
 import PrimaryButton from '@/components/PrimaryButton';
 import GradientBackground from '@/components/GradientBackground';
@@ -18,10 +18,19 @@ import AvatarPicker from '@/components/AvatarPicker';
 import CoverImagePicker from '@/components/CoverImagePicker';
 import SelectChip from '@/components/SelectChip';
 import ScreenGlow from '@/components/ScreenGlow';
+import SpecialitiesEditor from '@/components/SpecialitiesEditor';
+import MediaGalleryEditor from '@/components/MediaGalleryEditor';
+
+const TRAINER_SPECIALITY_IDEAS = [
+  'Weight loss', 'Strength & conditioning', 'Muscle gain', 'Mobility & flexibility', 'Injury rehab',
+  'Beginners welcome', 'Women-only classes', 'Kids & teens', 'Sports performance', 'Nutrition coaching',
+];
 
 const CATEGORY_OPTIONS: { label: string; value: TrainerCategory }[] = [
   { label: 'Gym', value: 'GYM' },
+  { label: 'Bodybuilding', value: 'BODYBUILDING' },
   { label: 'Calisthenics', value: 'CALISTHENICS' },
+  { label: 'Zumba', value: 'ZUMBA' },
   { label: 'Dancing', value: 'DANCING' },
   { label: 'Yoga', value: 'YOGA' },
   { label: 'CrossFit', value: 'CROSSFIT' },
@@ -35,6 +44,11 @@ export default function EditTrainerProfileScreen({ navigation }: any) {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const queryClient = useQueryClient();
   const palette = useRoleTheme();
+  const { width: screenW } = useWindowDimensions();
+  const applyProfile = (p: TrainerProfile) => {
+    queryClient.setQueryData(['trainer-profile', 'mine'], p);
+    queryClient.invalidateQueries({ queryKey: ['trainer-profile'], predicate: (q) => q.queryKey[1] !== 'mine' });
+  };
 
   const { data: existing, isLoading, isFetched } = useQuery({
     queryKey: ['trainer-profile', 'mine'], queryFn: TrainerApi.getMyProfile, retry: false,
@@ -137,7 +151,7 @@ export default function EditTrainerProfileScreen({ navigation }: any) {
               <Text style={styles.avatarHint}>Profile photo</Text>
             </View>
 
-            <Text style={styles.label}>Specialties</Text>
+            <Text style={styles.label}>Training types</Text>
             <View style={styles.chipRow}>
               {CATEGORY_OPTIONS.map((c) => (
                 <SelectChip key={c.value} label={c.label} selected={categories.includes(c.value)} onPress={() => toggleCategory(c.value)} />
@@ -205,6 +219,40 @@ export default function EditTrainerProfileScreen({ navigation }: any) {
               style={{ marginTop: spacing.lg, backgroundColor: palette.accent, shadowColor: palette.accent }}
             />
           </Card>
+
+          <Card>
+            <Text style={styles.cardTitle}>Specialities</Text>
+            <Text style={styles.cardSub}>What you're best at — shown on your profile and used in search.</Text>
+            {existing ? (
+              <View style={{ marginTop: spacing.md }}>
+                <SpecialitiesEditor
+                  value={existing.specialities ?? []}
+                  suggestions={TRAINER_SPECIALITY_IDEAS}
+                  placeholder="e.g. Strength & conditioning"
+                  onSave={async (next) => applyProfile(await TrainerApi.setMySpecialities(next))}
+                />
+              </View>
+            ) : (
+              <Text style={styles.lockedNote}>Save your profile first, then add specialities here.</Text>
+            )}
+          </Card>
+
+          <Card>
+            <Text style={styles.cardTitle}>Training Photos & Videos</Text>
+            <Text style={styles.cardSub}>Let clients see your sessions, space and results.</Text>
+            {existing ? (
+              <View style={{ marginTop: spacing.md }}>
+                <MediaGalleryEditor
+                  items={existing.media ?? []}
+                  width={screenW - spacing.md * 4}
+                  onAdd={async (m) => applyProfile(await TrainerApi.addMyMedia(m))}
+                  onRemove={async (url) => applyProfile(await TrainerApi.removeMyMedia(url))}
+                />
+              </View>
+            ) : (
+              <Text style={styles.lockedNote}>Save your profile first, then add photos and videos here.</Text>
+            )}
+          </Card>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -233,4 +281,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   textArea: { height: 90, textAlignVertical: 'top' },
   rowGap: { flexDirection: 'row', gap: spacing.sm },
+  cardTitle: { ...typography.h3, color: colors.text },
+  cardSub: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
+  lockedNote: { ...typography.caption, color: colors.textMuted, marginTop: spacing.md, fontStyle: 'italic' },
 });

@@ -143,7 +143,9 @@ async function resolvePreferredBaseUrl(): Promise<string> {
 
 apiClient.interceptors.request.use(async (config) => {
   config.baseURL = await resolvePreferredBaseUrl();
-  if (_accessToken) {
+  // A caller-supplied Authorization (the pending-verification upload session,
+  // see store/pendingSession.ts) wins over the stored sign-in token.
+  if (_accessToken && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${_accessToken}`;
   }
   return config;

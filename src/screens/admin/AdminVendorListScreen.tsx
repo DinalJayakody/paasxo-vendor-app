@@ -121,20 +121,29 @@ function VendorRow({ vendor, colors, onPress }: { vendor: AdminVendorSummary; co
             <Image source={{ uri: vendor.profileImageUrl }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
-              <Ionicons name="storefront-outline" size={18} color={colors.primary} />
+              <Ionicons name={vendor.accountType === 'TRAINER' ? 'barbell-outline' : 'storefront-outline'} size={18} color={colors.primary} />
             </View>
           )}
           <View style={styles.info}>
-            <Text style={styles.name} numberOfLines={1}>{vendor.displayName}</Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, { flexShrink: 1 }]} numberOfLines={1}>{vendor.displayName}</Text>
+              <View style={[styles.roleTag, vendor.accountType === 'TRAINER' && styles.roleTagTrainer]}>
+                <Text style={[styles.roleTagText, vendor.accountType === 'TRAINER' && styles.roleTagTextTrainer]}>
+                  {vendor.accountType === 'TRAINER' ? 'TRAINER' : 'VENUE'}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.email} numberOfLines={1}>{vendor.email}</Text>
           </View>
           <StatusBadge status={vendor.active ? 'ACTIVE' : 'INACTIVE'} />
         </View>
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Ionicons name="business-outline" size={13} color={colors.textMuted} />
-            <Text style={styles.metaText}>{vendor.venueCount} venue{vendor.venueCount === 1 ? '' : 's'}</Text>
-          </View>
+          {vendor.accountType !== 'TRAINER' && (
+            <View style={styles.metaItem}>
+              <Ionicons name="business-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.metaText}>{vendor.venueCount} venue{vendor.venueCount === 1 ? '' : 's'}</Text>
+            </View>
+          )}
           <View style={styles.metaItem}>
             <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
             <Text style={styles.metaText}>{vendor.bookingCount} booking{vendor.bookingCount === 1 ? '' : 's'}</Text>
@@ -154,6 +163,11 @@ function VendorRow({ vendor, colors, onPress }: { vendor: AdminVendorSummary; co
 }
 
 const rowStyles = (colors: ThemeColors) => StyleSheet.create({
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roleTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primarySoft },
+  roleTagTrainer: { backgroundColor: colors.successLight },
+  roleTagText: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.4, color: colors.primary },
+  roleTagTextTrainer: { color: colors.success },
   card: { paddingVertical: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft },

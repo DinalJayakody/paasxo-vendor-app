@@ -73,6 +73,11 @@ export default function SettingsScreen({ navigation }: any) {
       onPress: () => navigation.navigate('BankAccount'),
     },
     {
+      key: 'verification', icon: 'shield-checkmark-outline', label: 'Verification Documents',
+      sub: 'Business registration and ID', color: colors.primary,
+      onPress: () => navigation.navigate('VerificationDocuments'),
+    },
+    {
       key: 'notifications', icon: 'notifications-outline', label: 'Notification Preferences',
       sub: 'Bookings, payments & alerts', color: colors.teal,
       onPress: () => Alert.alert('Coming soon', 'Notification preferences are on the way.'),

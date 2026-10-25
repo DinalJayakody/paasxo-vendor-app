@@ -1,8 +1,10 @@
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
+import { MEDIA_UPLOAD_TIMEOUT_MS, PickedMedia, mediaFilePart } from './mediaUpload';
 import {
-  CreateSessionPayload, TrainerBooking, TrainerProfile, TrainerSession, TrainerSessionSlot,
-  UpsertTrainerProfilePayload,
+  CreateSessionPayload, Promotion, TrainerBooking, TrainerPlan, TrainerPlanPayload, TrainerPlanSale, TrainerCustomer,
+  TrainerProfile, TrainerSession, TrainerSessionSlot,
+  TrainerSlotOverview, UpsertTrainerProfilePayload,
 } from '@/types';
 
 function guessMimeType(uri: string): string {
@@ -109,8 +111,57 @@ export const TrainerApi = {
       .patch<TrainerSessionSlot>(ENDPOINTS.trainers.cancelSlot(sessionId, slotId))
       .then((r) => r.data),
 
+  /** Puts a cancelled, still-upcoming date back on sale. */
+  reopenSlot: (sessionId: number, slotId: number) =>
+    apiClient
+      .patch<TrainerSessionSlot>(ENDPOINTS.trainers.reopenSlot(sessionId, slotId))
+      .then((r) => r.data),
+
+  /** T9: start or replace a session's discount. */
+  setSessionPromotion: (sessionId: number, promo: Promotion) =>
+    apiClient.put<TrainerSession>(ENDPOINTS.trainers.sessionPromotion(sessionId), promo).then((r) => r.data),
+
+  clearSessionPromotion: (sessionId: number) =>
+    apiClient.delete<TrainerSession>(ENDPOINTS.trainers.sessionPromotion(sessionId)).then((r) => r.data),
+
+  // T4/T5/T6 — plans
+  getMyPlans: () => apiClient.get<TrainerPlan[]>(ENDPOINTS.trainers.plansMine).then((r) => r.data),
+  getPlanSales: () => apiClient.get<TrainerPlanSale[]>(ENDPOINTS.trainers.planSales).then((r) => r.data),
+  createPlan: (payload: TrainerPlanPayload) =>
+    apiClient.post<TrainerPlan>(ENDPOINTS.trainers.plans, payload).then((r) => r.data),
+  updatePlan: (id: number, payload: TrainerPlanPayload) =>
+    apiClient.put<TrainerPlan>(ENDPOINTS.trainers.plan(id), payload).then((r) => r.data),
+  setPlanActive: (id: number, active: boolean) =>
+    apiClient.patch<TrainerPlan>(ENDPOINTS.trainers.planActive(id), { active }).then((r) => r.data),
+  // A plan for each customer
+  getPlanCustomers: () => apiClient.get<TrainerCustomer[]>(ENDPOINTS.trainers.planCustomers).then((r) => r.data),
+  assignPlan: (planId: number, customerUid: string, content?: string) =>
+    apiClient.post<TrainerPlanSale>(ENDPOINTS.trainers.planAssign(planId), { customerUid, content }).then((r) => r.data),
+  updatePersonalPlan: (purchaseId: number, content: string) =>
+    apiClient.put<TrainerPlanSale>(ENDPOINTS.trainers.planPersonal(purchaseId), { content }).then((r) => r.data),
+
+  setMySpecialities: (specialities: string[]) =>
+    apiClient.put<TrainerProfile>(ENDPOINTS.trainers.mySpecialities, { specialities }).then((r) => r.data),
+
+  addMyMedia: (media: PickedMedia) => {
+    const formData = new FormData();
+    formData.append('file', mediaFilePart(media));
+    return apiClient
+      .post<TrainerProfile>(ENDPOINTS.trainers.myMedia, formData, { timeout: MEDIA_UPLOAD_TIMEOUT_MS })
+      .then((r) => r.data);
+  },
+
+  removeMyMedia: (url: string) =>
+    apiClient.delete<TrainerProfile>(ENDPOINTS.trainers.myMedia, { params: { url } }).then((r) => r.data),
+
   getRoster: (sessionId: number, slotId: number) =>
     apiClient
       .get<TrainerBooking[]>(ENDPOINTS.trainers.roster(sessionId), { params: { slotId } })
+      .then((r) => r.data),
+
+  // Every upcoming date across every session this trainer owns — "All Dates" screen.
+  getAllUpcomingSlots: (params: { date?: string; query?: string; page?: number; size?: number } = {}) =>
+    apiClient
+      .get<PagedResponse<TrainerSlotOverview>>(ENDPOINTS.trainers.allUpcomingSlots, { params })
       .then((r) => r.data),
 };

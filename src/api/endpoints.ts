@@ -45,6 +45,13 @@ export const ENDPOINTS = {
     subscriptionCheckout: '/vendor/subscription/checkout',
   },
   uploads: (category: string) => `/uploads/${category}`,
+  verificationDocuments: {
+    upload: '/verification-documents',
+    mine: '/verification-documents/mine',
+    one: (id: number) => `/verification-documents/${id}`,
+    file: (id: number) => `/verification-documents/${id}/file`,
+    review: (vendorUid: string, id: number) => `/admin/vendors/${encodeURIComponent(vendorUid)}/documents/${id}`,
+  },
   businessRegistrations: {
     create: '/vendor/business-registrations',
     mine: '/vendor/business-registrations/my',
@@ -63,6 +70,9 @@ export const ENDPOINTS = {
     blockSlotsBulk: (futsalId: number) => `/futsals/${futsalId}/slots/block-bulk`,
     closedDates: (futsalId: number) => `/futsals/${futsalId}/closed-dates`,
     closedDate: (futsalId: number, date: string) => `/futsals/${futsalId}/closed-dates/${date}`,
+    specialities: (id: number) => `/futsals/${id}/specialities`,
+    media: (id: number) => `/futsals/${id}/media`,
+    promotion: (id: number) => `/futsals/${id}/promotion`,
   },
   // Confirmed against the real BookingController in mobile-app-paasxo.
   bookings: {
@@ -94,6 +104,21 @@ export const ENDPOINTS = {
     generateSlots: (sessionId: number) => `/trainers/sessions/${sessionId}/slots/generate`,
     slots: (sessionId: number) => `/trainers/sessions/${sessionId}/slots`,
     cancelSlot: (sessionId: number, slotId: number) => `/trainers/sessions/${sessionId}/slots/${slotId}/cancel`,
+    reopenSlot: (sessionId: number, slotId: number) => `/trainers/sessions/${sessionId}/slots/${slotId}/reopen`,
+    mySpecialities: '/trainers/me/specialities',
+    sessionPromotion: (id: number) => `/trainers/sessions/${id}/promotion`,
+    plans: '/trainers/plans',
+    plansMine: '/trainers/plans/mine',
+    planSales: '/trainers/plans/sales',
+    planCustomers: '/trainers/plans/customers',
+    planAssign: (id: number) => `/trainers/plans/${id}/assign`,
+    planPersonal: (purchaseId: number) => `/trainers/plans/purchases/${purchaseId}/personal`,
+    plan: (id: number) => `/trainers/plans/${id}`,
+    planActive: (id: number) => `/trainers/plans/${id}/active`,
+    myMedia: '/trainers/me/media',
     roster: (sessionId: number) => `/trainers/sessions/${sessionId}/roster`,
+    // Every upcoming date across every session this trainer owns — backs the
+    // "All Dates" screen's cross-session search (by exact date and/or session name).
+    allUpcomingSlots: '/trainers/sessions/slots',
   },
 } as const;

@@ -124,9 +124,9 @@ export default function DashboardScreen({ navigation }: any) {
                   ) : (
                     <View style={[styles.venueImage, styles.venueImagePlaceholder]} />
                   )}
-                  <View style={[styles.statusBadge, venue.active ? styles.activeBadge : styles.inactiveBadge]}>
-                    <Text style={[styles.statusText, venue.active ? styles.activeText : styles.inactiveText]}>
-                      {venue.active ? 'Active' : 'Inactive'}
+                  <View style={[styles.statusBadge, venue.pendingReview ? styles.reviewBadge : venue.active ? styles.activeBadge : styles.inactiveBadge]}>
+                    <Text style={[styles.statusText, venue.pendingReview ? styles.reviewText : venue.active ? styles.activeText : styles.inactiveText]}>
+                      {venue.pendingReview ? 'Under review' : venue.active ? 'Active' : 'Inactive'}
                     </Text>
                   </View>
                 </View>
@@ -233,6 +233,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   activeBadge: { backgroundColor: colors.successLight },
   inactiveBadge: { backgroundColor: colors.dangerLight },
+  reviewBadge: { backgroundColor: colors.warningLight },
+  reviewText: { color: colors.warning },
   statusText: { fontWeight: '700', fontSize: 12 },
   activeText: { color: colors.success },
   inactiveText: { color: colors.danger },

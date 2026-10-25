@@ -101,7 +101,13 @@ export default function PaymentHistoryScreen() {
                     style={[styles.txRow, idx !== filtered.length - 1 && styles.txDivider]}
                   >
                     <View style={styles.txAvatar}>
-                      <Text style={styles.txAvatarText}>{p.sport?.[0] ?? '?'}</Text>
+                      {p.sourceType === 'TRAINER_PLAN' ? (
+                        <Ionicons name="clipboard" size={18} color={colors.success} />
+                      ) : p.sourceType === 'TRAINER_SESSION' ? (
+                        <Ionicons name="barbell" size={18} color={colors.success} />
+                      ) : (
+                        <Text style={styles.txAvatarText}>{p.sport?.[0] ?? '?'}</Text>
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.txName}>{p.customerName}</Text>
@@ -127,10 +133,10 @@ export default function PaymentHistoryScreen() {
               <View style={styles.guideRow}>
                 <Ionicons name="information-circle" size={20} color={colors.info} />
                 <Text style={styles.guideText}>
-                  Paasxo holds each match's payment safely until 48 hours before kickoff, so players who
-                  paid to join can always be refunded in full if the match is cancelled before then. Once a
-                  match is confirmed and that 48-hour window passes, your share (the total charged for the
-                  booking, minus Paasxo's 5% platform fee) becomes a payout below. Payouts are currently
+                  Paasxo holds each payment safely until shortly before the booking or session starts (48
+                  hours for venue bookings, 24 hours for trainer sessions), so the customer can always be
+                  refunded in full if it's cancelled before then. Once that window passes, your share (the
+                  total charged, minus Paasxo's platform fee) becomes a payout below. Payouts are currently
                   wired to your bank account manually by our team — "Due" means it's confirmed and waiting
                   to be transferred; "Paid" means the transfer has already been made.
                 </Text>
@@ -150,7 +156,7 @@ export default function PaymentHistoryScreen() {
             {payoutsLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
             ) : !payouts || payouts.length === 0 ? (
-              <EmptyState pose="sit" title="No payouts yet" message="Payouts appear here once a booking settles, 48 hours before its kickoff." />
+              <EmptyState pose="sit" title="No payouts yet" message="Payouts appear here once a booking or session settles, shortly before it starts." />
             ) : (
               <Card style={{ padding: 0 }}>
                 {payouts.map((p: Payout, idx: number) => (
@@ -160,8 +166,10 @@ export default function PaymentHistoryScreen() {
                     style={[styles.txRow, idx !== payouts.length - 1 && styles.txDivider]}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.txName}>{p.bookingTitle ?? `Booking #${p.bookingId}`}</Text>
-                      <Text style={styles.txSport}>{p.futsalName}</Text>
+                      <Text style={styles.txName}>
+                        {p.bookingTitle ?? (p.sourceType === 'TRAINER_PLAN' ? 'Trainer plan' : p.sourceType === 'TRAINER_SESSION' ? `Session #${p.trainerBookingId}` : `Booking #${p.bookingId}`)}
+                      </Text>
+                      <Text style={styles.txSport}>{p.futsalName ?? (p.sourceType === 'TRAINER_PLAN' ? 'Plan / membership' : p.sourceType === 'TRAINER_SESSION' ? 'Trainer session' : '')}</Text>
                       <Text style={styles.txDate}>
                         {p.slotDate} • Gross LKR {p.grossAmount.toFixed(2)} − {(p.commissionRate * 100).toFixed(0)}% fee
                       </Text>

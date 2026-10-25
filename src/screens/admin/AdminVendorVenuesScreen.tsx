@@ -65,16 +65,18 @@ export default function AdminVendorVenuesScreen({ route, navigation }: any) {
     onError: (e: any) => Alert.alert('Could not update venue status', e?.response?.data?.message ?? e?.response?.data?.error ?? 'Please try again'),
   });
 
-  const confirmToggleVenue = (venueId: number, venueName: string, currentlyActive: boolean) => {
+  const confirmToggleVenue = (venueId: number, venueName: string, currentlyActive: boolean, pendingReview = false) => {
     const nextActive = !currentlyActive;
     Alert.alert(
-      nextActive ? 'Activate venue?' : 'Deactivate venue?',
-      nextActive
+      pendingReview ? 'Approve venue?' : nextActive ? 'Activate venue?' : 'Deactivate venue?',
+      pendingReview
+        ? `${venueName} goes live for players right away, and the vendor is notified.`
+        : nextActive
         ? `${venueName} will be bookable again and appear in search right away.`
         : `${venueName} will be hidden from search and can't accept new bookings until reactivated. Existing bookings are unaffected.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: nextActive ? 'Activate' : 'Deactivate', style: nextActive ? 'default' : 'destructive',
+        { text: pendingReview ? 'Approve' : nextActive ? 'Activate' : 'Deactivate', style: nextActive ? 'default' : 'destructive',
           onPress: () => statusMutation.mutate({ futsalId: venueId, active: nextActive }) },
       ],
     );
@@ -105,15 +107,18 @@ export default function AdminVendorVenuesScreen({ route, navigation }: any) {
               <Card key={venue.id} style={styles.card}>
                 <View style={styles.topLine}>
                   <Text style={styles.title} numberOfLines={1}>{venue.name}</Text>
-                  <StatusBadge status={venue.active ? 'ACTIVE' : 'INACTIVE'} />
+                  <StatusBadge status={venue.pendingReview ? 'PENDING' : venue.active ? 'ACTIVE' : 'INACTIVE'} />
                 </View>
                 <Text style={styles.sub}>{venue.location}</Text>
+                {venue.pendingReview && (
+                  <Text style={[styles.sub, { color: colors.warning, marginTop: 4 }]}>New venue awaiting your review</Text>
+                )}
 
                 <PrimaryButton
-                  title={venue.active ? 'Deactivate Venue' : 'Activate Venue'}
+                  title={venue.pendingReview ? 'Approve & Publish Venue' : venue.active ? 'Deactivate Venue' : 'Activate Venue'}
                   icon={venue.active ? 'close-circle-outline' : 'checkmark-circle-outline'}
                   variant={venue.active ? 'outline' : 'primary'}
-                  onPress={() => confirmToggleVenue(venue.id, venue.name, venue.active)}
+                  onPress={() => confirmToggleVenue(venue.id, venue.name, venue.active, !!venue.pendingReview)}
                   loading={statusMutation.isPending && statusMutation.variables?.futsalId === venue.id}
                   style={styles.toggleBtn}
                 />

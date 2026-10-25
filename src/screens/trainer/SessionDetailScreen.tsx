@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { radius, spacing, typography, ThemeColors } from '@/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -13,9 +13,11 @@ import Card from '@/components/Card';
 import PrimaryButton from '@/components/PrimaryButton';
 import EmptyState from '@/components/EmptyState';
 import ScreenGlow from '@/components/ScreenGlow';
+import PromotionEditor from '@/components/PromotionEditor';
+import { TrainerSession } from '@/types';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  GYM: 'Gym', CALISTHENICS: 'Calisthenics', DANCING: 'Dancing', YOGA: 'Yoga',
+  GYM: 'Gym', BODYBUILDING: 'Bodybuilding', CALISTHENICS: 'Calisthenics', ZUMBA: 'Zumba', DANCING: 'Dancing', YOGA: 'Yoga',
   CROSSFIT: 'CrossFit', MARTIAL_ARTS: 'Martial Arts', PILATES: 'Pilates', OTHER: 'Training',
 };
 
@@ -36,6 +38,11 @@ export default function SessionDetailScreen({ route, navigation }: any) {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { sessionId } = route.params;
   const palette = useRoleTheme();
+  const queryClient = useQueryClient();
+  const applySession = (updated: TrainerSession) => {
+    queryClient.setQueryData(['trainer-session', sessionId], updated);
+    queryClient.invalidateQueries({ queryKey: ['trainer-sessions'] });
+  };
   const today = todayIso();
   const in30Days = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
 
@@ -112,6 +119,23 @@ export default function SessionDetailScreen({ route, navigation }: any) {
                   <Text style={styles.planText}>{session.planDetails}</Text>
                 </View>
               )}
+            </Card>
+          </Animated.View>
+
+          <Animated.View entering={FadeIn.duration(400).delay(120)}>
+            <Card>
+              <Text style={styles.sectionTitle}>Discount</Text>
+              <Text style={styles.description}>Offer a limited-time price to fill spots. Clients see it when they book.</Text>
+              <View style={{ marginTop: spacing.md }}>
+                <PromotionEditor
+                  value={session.promotion}
+                  basePrice={session.price}
+                  priceSuffix=" / session"
+                  accent={palette.accent}
+                  onSave={async (p) => applySession(await TrainerApi.setSessionPromotion(sessionId, p))}
+                  onClear={async () => applySession(await TrainerApi.clearSessionPromotion(sessionId))}
+                />
+              </View>
             </Card>
           </Animated.View>
 

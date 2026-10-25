@@ -25,7 +25,9 @@ const SPORTS_OPTIONS = [
 // Values must match the backend's TrainerCategory enum exactly.
 const TRAINER_CATEGORY_OPTIONS: { label: string; value: TrainerCategory }[] = [
   { label: 'Gym', value: 'GYM' },
+  { label: 'Bodybuilding', value: 'BODYBUILDING' },
   { label: 'Calisthenics', value: 'CALISTHENICS' },
+  { label: 'Zumba', value: 'ZUMBA' },
   { label: 'Dancing', value: 'DANCING' },
   { label: 'Yoga', value: 'YOGA' },
   { label: 'CrossFit', value: 'CROSSFIT' },
@@ -86,7 +88,7 @@ export default function RegisterScreen({ navigation }: any) {
       // won't auto-switch, so send them to the explanation screen ourselves.
       // Reset (not navigate) so Back can't return to this form or a stale session.
       if (pending) {
-        navigation.reset({ index: 0, routes: [{ name: 'PendingVerification' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'PendingVerification', params: { role } }] });
       }
     } catch (e: any) {
       Alert.alert('Registration failed', e?.response?.data?.error ?? e?.response?.data?.message ?? 'Please try again');

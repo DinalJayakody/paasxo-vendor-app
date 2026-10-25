@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, TouchableOpacity, Alert, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,9 +12,17 @@ import Card from '@/components/Card';
 import PrimaryButton from '@/components/PrimaryButton';
 import EmptyState from '@/components/EmptyState';
 import ScreenGlow from '@/components/ScreenGlow';
+import SpecialitiesEditor from '@/components/SpecialitiesEditor';
+import MediaGalleryEditor from '@/components/MediaGalleryEditor';
+import PromotionEditor from '@/components/PromotionEditor';
 import { FutsalApi } from '@/api/futsal';
 import { BookingApi } from '@/api/booking';
-import { TimeSlot, VendorBooking } from '@/types';
+import { TimeSlot, Venue, VendorBooking } from '@/types';
+
+const VENUE_SPECIALITY_IDEAS = [
+  'Floodlit for night games', 'Indoor court', 'Artificial turf', 'Free parking', 'Changing rooms',
+  'Showers', 'Equipment for hire', 'Coaching available', 'Cafeteria', 'Spectator seating',
+];
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -52,6 +60,12 @@ export default function VenueDetailScreen({ route, navigation }: any) {
   const { venueId } = route.params;
   const today = todayIso();
   const queryClient = useQueryClient();
+  const { width: screenW } = useWindowDimensions();
+  // Responses from specialities/media calls are the full venue — drop them straight into the cache.
+  const applyVenue = (v: Venue) => {
+    queryClient.setQueryData(['venue-detail', venueId], v);
+    queryClient.invalidateQueries({ queryKey: ['vendor-dashboard'] });
+  };
 
   const { data: venue, isLoading: loadingVenue } = useQuery({
     queryKey: ['venue-detail', venueId],
@@ -69,6 +83,13 @@ export default function VenueDetailScreen({ route, navigation }: any) {
 
   const confirmToggle = () => {
     if (!venue) return;
+    if (venue.pendingReview) {
+      Alert.alert(
+        'Under review',
+        'Paasxo is reviewing this venue. It goes live automatically once approved, and we\'ll notify you. Meanwhile you can finish its photos, specialities and availability.',
+      );
+      return;
+    }
     const nextActive = !venue.active;
     Alert.alert(
       nextActive ? 'Activate venue?' : 'Deactivate venue?',
@@ -166,10 +187,15 @@ export default function VenueDetailScreen({ route, navigation }: any) {
                 <TouchableOpacity
                   onPress={confirmToggle}
                   disabled={statusMutation.isPending}
-                  style={[styles.activePill, !venue.active && styles.inactivePill]}
+                  style={[styles.activePill, !venue.active && styles.inactivePill, venue.pendingReview && styles.reviewPill]}
                 >
                   {statusMutation.isPending ? (
                     <ActivityIndicator size="small" color={venue.active ? colors.success : colors.danger} />
+                  ) : venue.pendingReview ? (
+                    <>
+                      <Ionicons name="hourglass-outline" size={12} color={colors.warning} />
+                      <Text style={[styles.activePillText, { color: colors.warning }]}>UNDER REVIEW</Text>
+                    </>
                   ) : (
                     <>
                       {venue.active && <PulsingDot styles={styles} />}
@@ -181,7 +207,13 @@ export default function VenueDetailScreen({ route, navigation }: any) {
                   )}
                 </TouchableOpacity>
               </View>
-              <Text style={styles.toggleHint}>Tap the status above to {venue.active ? 'deactivate' : 'activate'} this venue.</Text>
+              {venue.pendingReview ? (
+                <Text style={styles.reviewNote}>
+                  Paasxo is reviewing this venue before it appears to players. It goes live automatically once approved — we'll notify you.
+                </Text>
+              ) : (
+                <Text style={styles.toggleHint}>Tap the status above to {venue.active ? 'deactivate' : 'activate'} this venue.</Text>
+              )}
               {loadingSlots ? (
                 <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.sm }} />
               ) : (
@@ -191,6 +223,52 @@ export default function VenueDetailScreen({ route, navigation }: any) {
                     : 'No slots generated for today yet — generate them from Manage Availability.'}
                 </Text>
               )}
+            </Card>
+          </Animated.View>
+
+          <Animated.View entering={FadeIn.duration(400).delay(190)}>
+            <Card>
+              <Text style={styles.sectionTitle}>Specialities</Text>
+              <Text style={styles.sectionSub}>Shown to players on your venue page and used in search.</Text>
+              <View style={{ marginTop: spacing.md }}>
+                <SpecialitiesEditor
+                  value={venue.specialities ?? []}
+                  suggestions={VENUE_SPECIALITY_IDEAS}
+                  placeholder="e.g. Floodlit for night games"
+                  onSave={async (next) => applyVenue(await FutsalApi.setSpecialities(venueId, next))}
+                />
+              </View>
+            </Card>
+          </Animated.View>
+
+          <Animated.View entering={FadeIn.duration(400).delay(198)}>
+            <Card>
+              <Text style={styles.sectionTitle}>Discounts</Text>
+              <Text style={styles.sectionSub}>Fill quiet hours with a limited-time offer. Players see it on your venue.</Text>
+              <View style={{ marginTop: spacing.md }}>
+                <PromotionEditor
+                  value={venue.promotion}
+                  basePrice={venue.pricePerSlot}
+                  priceSuffix={` / ${venue.slotDurationMinutes}min`}
+                  onSave={async (p) => applyVenue(await FutsalApi.setPromotion(venueId, p))}
+                  onClear={async () => applyVenue(await FutsalApi.clearPromotion(venueId))}
+                />
+              </View>
+            </Card>
+          </Animated.View>
+
+          <Animated.View entering={FadeIn.duration(400).delay(205)}>
+            <Card>
+              <Text style={styles.sectionTitle}>Photos & Videos</Text>
+              <Text style={styles.sectionSub}>Show off your premises — courts, facilities, night lighting.</Text>
+              <View style={{ marginTop: spacing.md }}>
+                <MediaGalleryEditor
+                  items={venue.media ?? []}
+                  width={screenW - spacing.md * 4}
+                  onAdd={async (m) => applyVenue(await FutsalApi.addMedia(venueId, m))}
+                  onRemove={async (url) => applyVenue(await FutsalApi.removeMedia(venueId, url))}
+                />
+              </View>
             </Card>
           </Animated.View>
 
@@ -278,6 +356,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   activePillText: { color: colors.success, fontWeight: '700', fontSize: 12 },
   inactivePill: { backgroundColor: colors.dangerLight },
+  reviewPill: { backgroundColor: colors.warningLight },
+  reviewNote: { ...typography.caption, color: colors.warning, marginTop: 8, lineHeight: 18 },
+  sectionSub: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
   inactivePillText: { color: colors.danger },
   toggleHint: { ...typography.caption, color: colors.textMuted, marginTop: 6, textAlign: 'right' },
   dotWrap: { width: 8, height: 8, alignItems: 'center', justifyContent: 'center' },

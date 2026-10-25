@@ -15,7 +15,7 @@ import ScreenGlow from '@/components/ScreenGlow';
 import { useGlassTabBarHeight } from '@/components/GlassTabBar';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  GYM: 'Gym', CALISTHENICS: 'Calisthenics', DANCING: 'Dancing', YOGA: 'Yoga',
+  GYM: 'Gym', BODYBUILDING: 'Bodybuilding', CALISTHENICS: 'Calisthenics', ZUMBA: 'Zumba', DANCING: 'Dancing', YOGA: 'Yoga',
   CROSSFIT: 'CrossFit', MARTIAL_ARTS: 'Martial Arts', PILATES: 'Pilates', OTHER: 'Training',
 };
 

@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
-import { BulkSlotActionResult, CloseDateSummary, ClosedDateItem, CreateVenuePayload, SlotStatus, TimeSlot, Venue } from '@/types';
+import { MEDIA_UPLOAD_TIMEOUT_MS, PickedMedia, mediaFilePart } from './mediaUpload';
+import { BulkSlotActionResult, CloseDateSummary, ClosedDateItem, CreateVenuePayload, Promotion, SlotStatus, TimeSlot, Venue } from '@/types';
 
 function guessMimeType(uri: string): string {
   const ext = uri.split('.').pop()?.toLowerCase();
@@ -108,4 +109,27 @@ export const FutsalApi = {
 
   getClosedDates: (futsalId: number) =>
     apiClient.get<ClosedDateItem[]>(ENDPOINTS.futsals.closedDates(futsalId)).then((r) => r.data),
+
+  /** Replaces the venue's specialities (max 15, each up to 40 chars — trimmed server-side). */
+  setSpecialities: (id: number, specialities: string[]) =>
+    apiClient.put<Venue>(ENDPOINTS.futsals.specialities(id), { specialities }).then((r) => r.data),
+
+  /** Adds one photo or video to the venue gallery (max 20). */
+  addMedia: (id: number, media: PickedMedia) => {
+    const formData = new FormData();
+    formData.append('file', mediaFilePart(media));
+    return apiClient
+      .post<Venue>(ENDPOINTS.futsals.media(id), formData, { timeout: MEDIA_UPLOAD_TIMEOUT_MS })
+      .then((r) => r.data);
+  },
+
+  removeMedia: (id: number, url: string) =>
+    apiClient.delete<Venue>(ENDPOINTS.futsals.media(id), { params: { url } }).then((r) => r.data),
+
+  /** V6: start or replace the venue's discount. */
+  setPromotion: (id: number, promo: Promotion) =>
+    apiClient.put<Venue>(ENDPOINTS.futsals.promotion(id), promo).then((r) => r.data),
+
+  clearPromotion: (id: number) =>
+    apiClient.delete<Venue>(ENDPOINTS.futsals.promotion(id)).then((r) => r.data),
 };

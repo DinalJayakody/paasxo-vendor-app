@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme, Theme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -106,17 +106,62 @@ export default function RootNavigator() {
     });
   }, [isAuthenticated, isAdmin]);
 
-  // Tapping a push (app backgrounded/killed) deep-links the same way tapping
-  // the equivalent row in NotificationsScreen already does.
+  // Tapping a push opens the matching screen — the same place tapping that row
+  // in NotificationsScreen goes — or the Notifications screen for anything else.
+  // Works from every app state: the tap that cold-launched the app is read via
+  // getLastNotificationResponseAsync and held until the user is signed in and
+  // navigation is ready (it used to be dropped when navigation wasn't ready yet).
+  const pendingPush = useRef<Record<string, unknown> | null>(null);
+  const handledTaps = useRef(new Set<string>());
+
+  const flushPendingPush = useCallback(() => {
+    const data = pendingPush.current;
+    if (!data || !navigationRef.isReady() || !isAuthenticated || isHydrating) return;
+    pendingPush.current = null;
+    if (isAdmin) return; // the admin console has no notifications
+    const nav = navigationRef.navigate as unknown as (screen: string, params?: object) => void;
+    const toId = (v: unknown) => (typeof v === 'number' || (typeof v === 'string' && /^\d{1,18}$/.test(v)) ? Number(v) : null);
+    const bookingId = toId(data.bookingId);
+    const slotId = toId(data.trainerSlotId);
+    const sessionId = toId(data.trainerSessionId);
+
+    if (!isTrainer && data.type === 'BOOKING_PENDING_VENDOR_APPROVAL' && bookingId) {
+      nav('BookingRequestDetail', { bookingId });
+    } else if (isTrainer && data.type === 'TRAINER_SESSION_JOINED' && slotId && sessionId) {
+      nav('SessionRoster', { sessionId, slotId });
+    } else if (isTrainer && data.type === 'TRAINER_PLAN_PURCHASED') {
+      nav('TrainerPlans');
+    } else if (!isTrainer && data.type === 'VENUE_APPROVED' && toId(data.venueId)) {
+      nav('VenueDetail', { venueId: toId(data.venueId) });
+    } else {
+      nav('Notifications');
+    }
+    if (typeof data.notificationId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(data.notificationId)) {
+      NotificationApi.markRead(data.notificationId).catch(() => {});
+    }
+    Notifications.clearLastNotificationResponseAsync().catch(() => {});
+  }, [isAuthenticated, isHydrating, isAdmin, isTrainer, navigationRef]);
+
+  const handlePushResponse = useCallback((response: Notifications.NotificationResponse) => {
+    const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+    if (handledTaps.current.has(key)) return; // listener + cold-start lookup can both report one tap
+    handledTaps.current.add(key);
+    const data = (response.notification.request.content.data ?? {}) as Record<string, unknown>;
+    if (typeof data.type !== 'string') return;
+    pendingPush.current = data;
+    flushPendingPush();
+  }, [flushPendingPush]);
+
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as { type?: string; bookingId?: number } | undefined;
-      if (data?.type === 'BOOKING_PENDING_VENDOR_APPROVAL' && data.bookingId && navigationRef.isReady()) {
-        (navigationRef.navigate as any)('BookingRequestDetail', { bookingId: data.bookingId });
-      }
-    });
+    const sub = Notifications.addNotificationResponseReceivedListener(handlePushResponse);
+    Notifications.getLastNotificationResponseAsync()
+      .then((last) => { if (last) handlePushResponse(last); })
+      .catch(() => {});
     return () => sub.remove();
-  }, []);
+  }, [handlePushResponse]);
+
+  // Sign-in / hydration finishing can be what unblocks a held tap.
+  useEffect(() => { flushPendingPush(); }, [flushPendingPush]);
 
   if (isHydrating) {
     return (
@@ -127,7 +172,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} theme={buildNavTheme(c, resolvedTheme === 'dark')}>
+    <NavigationContainer ref={navigationRef} onReady={flushPendingPush} theme={buildNavTheme(c, resolvedTheme === 'dark')}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.background } }}>
         {!isAuthenticated ? (
           <>
@@ -137,8 +182,9 @@ export default function RootNavigator() {
                 this exact same Login form (see LoginScreen's handleSignIn); the
                 accountType coming back as 'ADMIN' is what routes here to the
                 isAdmin branch below instead of the vendor/trainer one. */}
-            {/* Reached only via RegisterScreen's navigation.reset after a VENDOR
-                sign-up that's pending manual verification (see authStore.register). */}
+            {/* Reached after a VENDOR/TRAINER sign-up that's pending manual verification
+                (RegisterScreen), or when a pending provider tries to sign in (LoginScreen) —
+                both with an in-memory token so they can upload verification documents. */}
             <Stack.Screen name="PendingVerification" getComponent={() => require('@/screens/PendingVerificationScreen').default} />
           </>
         ) : isAdmin ? (
@@ -158,6 +204,10 @@ export default function RootNavigator() {
             <Stack.Screen name="SessionDetail" getComponent={() => require('@/screens/trainer/SessionDetailScreen').default} />
             <Stack.Screen name="ManageSessionAvailability" getComponent={() => require('@/screens/trainer/ManageSessionAvailabilityScreen').default} />
             <Stack.Screen name="SessionRoster" getComponent={() => require('@/screens/trainer/SessionRosterScreen').default} />
+            <Stack.Screen name="AllDates" getComponent={() => require('@/screens/trainer/AllDatesScreen').default} />
+            <Stack.Screen name="TrainerPlans" getComponent={() => require('@/screens/trainer/TrainerPlansScreen').default} />
+            <Stack.Screen name="BankAccount" getComponent={() => require('@/screens/BankAccountScreen').default} />
+            <Stack.Screen name="VerificationDocuments" getComponent={() => require('@/screens/VerificationDocumentsScreen').default} />
             <Stack.Screen name="Subscription" getComponent={() => require('@/screens/SubscriptionScreen').default} />
             <Stack.Screen name="Notifications" getComponent={() => require('@/screens/NotificationsScreen').default} />
           </>
@@ -168,6 +218,7 @@ export default function RootNavigator() {
             <Stack.Screen name="VenueDetail" getComponent={() => require('@/screens/VenueDetailScreen').default} />
             <Stack.Screen name="ManageAvailability" getComponent={() => require('@/screens/ManageAvailabilityScreen').default} />
             <Stack.Screen name="BankAccount" getComponent={() => require('@/screens/BankAccountScreen').default} />
+            <Stack.Screen name="VerificationDocuments" getComponent={() => require('@/screens/VerificationDocumentsScreen').default} />
             <Stack.Screen name="Subscription" getComponent={() => require('@/screens/SubscriptionScreen').default} />
             <Stack.Screen name="Notifications" getComponent={() => require('@/screens/NotificationsScreen').default} />
             <Stack.Screen

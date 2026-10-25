@@ -25,6 +25,9 @@ function timeAgo(iso: string): string {
 function notificationIcon(type: string): keyof typeof Ionicons.glyphMap {
   switch (type) {
     case 'BOOKING_PENDING_VENDOR_APPROVAL': return 'hourglass-outline';
+    case 'TRAINER_SESSION_JOINED': return 'barbell-outline';
+    case 'TRAINER_PLAN_PURCHASED': return 'clipboard-outline';
+    case 'VENUE_APPROVED': return 'checkmark-circle-outline';
     default: return 'notifications-outline';
   }
 }
@@ -64,6 +67,16 @@ export default function NotificationsScreen({ navigation }: any) {
     if (!n.read) markReadMutation.mutate(n.id);
     if (n.type === 'BOOKING_PENDING_VENDOR_APPROVAL' && n.bookingId) {
       navigation.navigate('BookingRequestDetail', { bookingId: n.bookingId });
+    } else if (n.type === 'TRAINER_SESSION_JOINED' && n.matchSnapshot?.sessionId && n.matchSnapshot?.slotId) {
+      navigation.navigate('SessionRoster', {
+        sessionId: n.matchSnapshot.sessionId,
+        slotId: n.matchSnapshot.slotId,
+        slotDate: n.matchSnapshot.slotDate,
+      });
+    } else if (n.type === 'TRAINER_PLAN_PURCHASED') {
+      navigation.navigate('TrainerPlans');
+    } else if (n.type === 'VENUE_APPROVED' && n.matchSnapshot?.venueId) {
+      navigation.navigate('VenueDetail', { venueId: Number(n.matchSnapshot.venueId) });
     }
   };
 

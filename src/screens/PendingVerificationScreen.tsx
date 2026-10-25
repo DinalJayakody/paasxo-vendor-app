@@ -8,6 +8,8 @@ import { useTheme } from '@/context/ThemeContext';
 import GradientBackground from '@/components/GradientBackground';
 import Mascot from '@/components/Mascot';
 import PrimaryButton from '@/components/PrimaryButton';
+import VerificationDocumentsCard from '@/components/VerificationDocumentsCard';
+import { usePendingSession } from '@/store/pendingSession';
 
 /**
  * Shown right after a vendor submits Register — their account was created
@@ -17,9 +19,17 @@ import PrimaryButton from '@/components/PrimaryButton';
  * yet, so this screen replaces (not follows) the auth stack — see
  * RegisterScreen's navigation.reset to 'PendingVerification'.
  */
-export default function PendingVerificationScreen({ navigation }: any) {
+export default function PendingVerificationScreen({ navigation, route }: any) {
   const { colors, resolvedTheme } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const token = usePendingSession((s) => s.token);
+  const role: 'VENDOR' | 'TRAINER' = route?.params?.role === 'TRAINER' ? 'TRAINER' : 'VENDOR';
+  const returning = !!route?.params?.returning;
+
+  const backToSignIn = () => {
+    usePendingSession.getState().setToken(null);
+    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+  };
 
   return (
     <View style={styles.root}>
@@ -38,8 +48,9 @@ export default function PendingVerificationScreen({ navigation }: any) {
 
             <Text style={styles.title}>Verification in progress</Text>
             <Text style={styles.body}>
-              Thanks for registering with Paasxo! We've received your vendor details and
-              our operations team is reviewing them now.
+              {returning
+                ? 'Your account is still being reviewed by our operations team.'
+                : "Thanks for registering with Paasxo! We've received your details and our operations team is reviewing them now."}
             </Text>
             <Text style={styles.body}>
               Someone from Paasxo will be in touch shortly to complete your verification.
@@ -49,16 +60,28 @@ export default function PendingVerificationScreen({ navigation }: any) {
 
             <View style={styles.stepsCard}>
               <StepRow colors={colors} icon="mail-outline" text="Your details were sent to our operations team" done />
+              <StepRow colors={colors} icon="document-attach-outline" text="Add your business registration or ID below to speed things up" active={!!token} />
               <StepRow colors={colors} icon="hourglass-outline" text="Manual verification in progress" active />
               <StepRow colors={colors} icon="checkmark-circle-outline" text="Account activated — you can sign in" />
             </View>
 
+            <Text style={styles.body}>
+              While you wait, you can sign in to the Paasxo player app with the same
+              email to book, play and train as a player.
+            </Text>
+
             <PrimaryButton
               title="Back to Sign In"
-              onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
+              onPress={backToSignIn}
               style={{ marginTop: spacing.lg }}
             />
           </View>
+
+          {token ? (
+            <View style={{ marginTop: spacing.md }}>
+              <VerificationDocumentsCard role={role} token={token} />
+            </View>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </View>

@@ -14,6 +14,7 @@ import Card from '@/components/Card';
 import PrimaryButton from '@/components/PrimaryButton';
 import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
+import AdminDocumentReview from '@/components/AdminDocumentReview';
 
 /** Vendor overview — profile, financial summary, business registration docs,
  *  and Active/Inactive control. Bookings/Payments/Payouts/Venues each live on
@@ -45,7 +46,7 @@ export default function AdminVendorDetailScreen({ route, navigation }: any) {
     Alert.alert(
       nextActive ? 'Activate vendor?' : 'Deactivate vendor?',
       nextActive
-        ? `${vendor.displayName} will be able to sign in and manage their venues immediately.`
+        ? `${vendor.displayName} will be able to sign in and manage their ${vendor.accountType === 'TRAINER' ? 'sessions' : 'venues'} immediately.`
         : `${vendor.displayName} will be signed out and unable to log in until reactivated.`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -116,6 +117,14 @@ export default function AdminVendorDetailScreen({ route, navigation }: any) {
           <NavRow colors={colors} icon="calendar-outline" label="Bookings" count={vendor.bookings.length} onPress={() => navigateTo('AdminVendorBookings')} />
           <NavRow colors={colors} icon="card-outline" label="Payments" count={vendor.payments.length} onPress={() => navigateTo('AdminVendorPayments')} />
           <NavRow colors={colors} icon="wallet-outline" label="Payouts" count={vendor.payouts.length} badge={vendor.totalDue > 0 ? `LKR ${Math.round(vendor.totalDue).toLocaleString()} due` : undefined} onPress={() => navigateTo('AdminVendorPayouts')} />
+        </Section>
+
+        <Section title="ID & Registration Documents" colors={colors}>
+          <AdminDocumentReview
+            vendorUid={firebaseUid}
+            documents={vendor.verificationDocuments ?? []}
+            onChanged={() => queryClient.invalidateQueries({ queryKey: ['admin', 'vendor', firebaseUid] })}
+          />
         </Section>
 
         <Section title="Business Registration" colors={colors}>
