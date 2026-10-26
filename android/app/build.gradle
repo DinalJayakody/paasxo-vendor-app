@@ -102,6 +102,14 @@ android {
         versionName "1.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+
+        // Google Maps SDK for Android key (react-native-maps, venue location
+        // picker). Supplied at build time — env var or gradle property — never
+        // committed. Without the meta-data at all the SDK crashes ("API key not
+        // found") when a map opens; an empty value shows blank tiles instead.
+        manifestPlaceholders = [
+            googleMapsApiKey: (System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: findProperty('GOOGLE_MAPS_ANDROID_API_KEY')) ?: ''
+        ]
     }
     signingConfigs {
         debug {
